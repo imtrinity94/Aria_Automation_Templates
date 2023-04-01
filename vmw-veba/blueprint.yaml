@@ -1,0 +1,82 @@
+formatVersion: 1
+inputs:
+  vebaRootPassword:
+    description: Root password for the appliance
+    type: string
+    default:
+  vebaHostname:
+    descrition: Hostname for the appliance
+    type: string
+    default: veba01
+  vcenterServer:
+    description: The vCenter to Connect VEBA to
+    type: string
+    default: vc01.domain.local
+  vcenterUsername:
+    description: vCenter Username
+    type: string
+    default: administrator@vsphere.local
+  vcenterPassword:
+    description: vCenter Password
+    type: string
+    default: 
+  vcenterDisableTLSVerification:
+    description: Disable vCenter TLS
+    type: string
+    default: 'True' #Note: This is a boolean but due to a bug needs to be a string in the blueprint and MUST have a capital T in True.
+  openFaasPassword:
+    description: password for admin user for OpenFaaS UI
+    type: string
+    default: 
+  deploymentImage:
+    description: http location of ova image
+    type: string
+    default: 'http://minio.domain.local/images/vCenter_Event_Broker_Appliance_v0.4.0.ova'
+resources:
+  veba:
+    type: Cloud.vSphere.Machine
+    properties:
+      imageRef: '${input.deploymentImage}'
+      cpuCount: 4
+      totalMemoryMB: 12288
+      ovfProperties:
+        - key: guestinfo.hostname
+          value: '${input.vebaHostname}'
+        - key: guestinfo.ipaddress
+          value: '${self.networks[0].address}'
+        - key: guestinfo.netmask
+          value: 23 (255.255.254.0)
+        - key: guestinfo.gateway
+          value: '${Cloud_vSphere_Network_1.gatewayAddress}'
+        - key: guestinfo.dns
+          value: '${substring(resource.Cloud_vSphere_Network_1.dnsServerAddresses, 1, length(resource.Cloud_vSphere_Network_1.dnsServerAddresses)-1)}'
+        - key: guestinfo.domain"
+          value: '${Cloud_vSphere_Network_1.domain}'
+        - key: searchpath
+          value: '${substring(resource.Cloud_vSphere_Network_1.dnsSearchDomains, 1, length(resource.Cloud_vSphere_Network_1.dnsSearchDomains)-1)}'
+        - key: guestinfo.root_password
+          value: '${input.vebaRootPassword}'
+        - key: guestinfo.vcenter_server
+          value: '${input.vcenterServer}'
+        - key: guestinfo.vcenter_username
+          value: '${input.vcenterUsername}'
+        - key: guestinfo.vcenter_password
+          value: '${input.vcenterPassword}'
+        - key: guestinfo.vcenter_disable_tls_verification
+          value: '${input.vcenterDisableTLSVerification}'
+        - key: guestinfo.openfaas_password
+          value: '${input.openFaasPassword}'
+      # cloudConfig:
+      #  runcmd:
+      #  - systemctl start sshd
+      networks:
+        - name: '${resource.Cloud_vSphere_Network_1.name}'
+          network: '${resource.Cloud_vSphere_Network_1.id}'
+          assignment: static
+  Cloud_vSphere_Network_1:
+    type: Cloud.Network
+    properties:
+      name: vRA_Network
+      networkType: existing
+      constraints:
+        - tag: static-ip

@@ -1,0 +1,47 @@
+name: Docker Host
+version: 1.0
+formatVersion: 1
+inputs:
+  platform:
+    type: string
+    description: Applies a constraint to this blueprint to inform the placement decision
+    enum:
+      - aws
+      - azure
+      - gcp
+      - vsphere
+resources:
+  Cloud_Network:
+    type: Cloud.Network
+    properties:
+      networkType: existing
+  docker_host:
+    type: Cloud.Machine
+    properties:
+      image: ubuntu 16.04
+      flavor: small
+      constraints:
+        - tag: 'platform:${input.platform}'
+      cloudConfig: |
+        #cloud-config
+        apt:
+          sources:
+            docker.list:
+              source: deb https://download.docker.com/linux/ubuntu $RELEASE stable
+              keyserver: https://download.docker.com/linux/ubuntu/gpg
+        repo_update: true
+        repo_upgrade: all
+        packages:
+          - docker-ce
+        write_files:
+          - path: /etc/systemd/system/docker.service.d/override.conf
+            permissions: '0644'
+            content: |
+             [Service]
+             ExecStart=
+             ExecStart=/usr/bin/dockerd -H fd:// -H tcp://0.0.0.0:2375
+        runcmd:
+          - systemctl daemon-reload
+          - systemctl restart docker
+      networks:
+        - network: '${resource.Cloud_Network.id}'

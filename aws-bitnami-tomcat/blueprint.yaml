@@ -1,0 +1,37 @@
+name: bitnami-tomcat
+version: 0.1
+formatVersion: 1
+inputs:
+  SelectCloud:
+    type: string
+    enum:
+      - 'env:aws'
+  hostname1:
+    type: string
+    default: bitnami-tomcat
+  user:
+    type: string
+    title: SSH user
+    description: Username for this deployment.
+    default: vmware
+  sshkey:
+    type: string
+    encrypted: true
+    title: SSH public key.
+    description: The public key for SSH connectivity (cat ~/.ssh/id_rsa.pub)
+resources:
+  Cloud_Machine_1:
+    type: Cloud.Machine
+    properties:
+      image: bitnami-tomcat-8.5.46
+      flavor: small
+      cloudConfig:
+        hostname: '${input.hostname1}'
+        users:
+          - name: '${input.user}'
+            ssh-authorized-keys:
+              - '${input.sshkey}'
+            sudo:
+              - 'ALL=(ALL) NOPASSWD:ALL'
+            groups: sudo
+            shell: /bin/bash

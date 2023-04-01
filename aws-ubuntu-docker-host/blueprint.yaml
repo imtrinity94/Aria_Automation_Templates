@@ -1,0 +1,61 @@
+name: ubuntu-docker-host-aws
+version: 0.1
+formatVersion: 1
+inputs:
+  SelectCloud:
+    type: string
+    enum:
+      - 'env:aws'
+  hostname1:
+    type: string
+    default: ubuntu-docker-host-aws
+  user:
+    type: string
+    title: SSH user
+    description: Username for this deployment.
+    default: vmware
+  sshkey:
+    type: string
+    encrypted: true
+    title: SSH public key.
+    description: The public key for SSH connectivity (cat ~/.ssh/id_rsa.pub)
+resources:
+  Cloud_Machine_1:
+    type: Cloud.Machine
+    properties:
+      image: ubuntu-server-18.04
+      flavor: small
+      cloudConfig:
+        hostname: '${input.hostname1}'
+        users:
+          - name: '${input.user}'
+            ssh-authorized-keys:
+              - '${input.sshkey}'
+            sudo:
+              - 'ALL=(ALL) NOPASSWD:ALL'
+            groups: sudo
+            shell: /bin/bash
+        repo_update: true
+        repo_upgrade: all
+        package_update: true
+        package_upgrade: all
+
+        packages:
+         - wget
+         - sshpass
+         - curl
+
+        runcmd:
+         - sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g'  /etc/ssh/sshd_config
+         - sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/g'  /etc/ssh/sshd_config
+         - service sshd restart
+         - apt-get update -y 
+         - apt-get install apt-transport-https ca-certificates curl software-properties-common
+         - /usr/bin/curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+         - apt-key fingerprint 0EBFCD88 -y 
+         - add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+         - apt-get update -y 
+         - apt-get install docker-ce -y
+         - /bin/sed -i 's@ExecStart=/usr/bin/dockerd -H fd://@ExecStart=/usr/bin/dockerd -H tcp://0.0.0.0:2375 -H unix:///var/run/docker.sock@' /lib/systemd/system/docker.service
+         - /bin/systemctl daemon-reload
+         - /bin/systemctl restart docker

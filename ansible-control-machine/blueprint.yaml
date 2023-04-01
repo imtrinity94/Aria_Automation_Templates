@@ -1,0 +1,134 @@
+name: Ansible Control Machine
+version: 1.0
+formatVersion: 1
+inputs:
+  slack_webhook:
+    type: string
+    description: A webhook for Slack notifications. This will be used to send the public key details of the generated keypair that ansible will use to connect to remote hosts.
+  ansible_username:
+    type: string
+    description: The username for the ansible user account
+    default: ansible
+  ansible_user_password:
+    type: string
+    description: The password for the ansible user. The connection from Cloud Assembly currently uses password based auth, so this is a mandatory requirement.
+  ansible_vault_password:
+    type: string
+    description: The password that will be written to the Vault file.
+  ansible_ssh_key:
+    type: string
+    description: The public half of SSH key used for authentication to this box. Not to be confused with the SSH key that will be used by the ansible user account to SSH into managed instances.
+resources:
+  ansible_control_machine:
+    type: Cloud.Machine
+    properties:
+      image: ubuntu 16.04
+      flavor: small
+      constraints:
+        - tag: 'platform:aws'
+      cloudConfig: |
+        #cloud-config
+        repo_update: true
+        apt:
+          sources:
+            ansible-ubuntu-ansible.list:
+              source: "ppa:ansible/ansible"
+              keyserver: 'keyserver.ubuntu.com'
+              keyid: 7BB9C367
+        packages:
+          - ansible
+        write_files:
+          - path: /etc/ansible/playbooks/ansible.yml
+            content: |
+              ---
+              - name: Install and Configure Ansible Control Machine for use with VMware Cloud Assembly
+                hosts: localhost
+                gather_facts: true
+                vars:
+                  ansible_username: "${input.ansible_username}"
+                  ansible_user_password: "${input.ansible_user_password}"
+                  ansible_vault_password: "${input.ansible_vault_password}"
+                  slack_notification_content: "{{ lookup('file', '/home/ansible/.ssh/id_rsa.pub') }}"
+                  slack_notification_webhook: "${input.slack_webhook}"
+                  ansible_ssh_key: "${input.ansible_ssh_key}"
+                tasks:
+                  - name: Create Ansible User
+                    become: true
+                    user:
+                      name: "{{ ansible_username }}"
+                      groups: sudo
+                      shell: /bin/bash
+                      generate_ssh_key: yes
+                      password: "{{ ansible_user_password | password_hash('sha512') }}"
+
+                  - name: Set Authorised Key for Ansible User
+                    authorized_key:
+                      user: "{{ ansible_username }}"
+                      key: "{{ ansible_ssh_key }}"
+
+                  - name: Set Ansible Directory Permissions
+                    file:
+                      owner: "{{ ansible_username }}"
+                      path: /etc/ansible
+                      recurse: yes
+                      state: directory
+
+                  - name: Create Cleartext Vault Pass File
+                    lineinfile:
+                      create: yes
+                      owner: "{{ ansible_username }}"
+                      path: /etc/ansible/vault_pass.txt
+                      line: "{{ ansible_vault_password }}"
+
+                  - name: Update Config with Pass File Location
+                    lineinfile:
+                      owner: "{{ ansible_username }}"
+                      path: /etc/ansible/ansible.cfg
+                      regexp: "vault_password_file"
+                      line: "vault_password_file = /etc/ansible/vault_pass.txt"
+
+                  - name: Update Config with Private Key Location
+                    lineinfile:
+                      owner: "{{ ansible_username }}"
+                      path: /etc/ansible/ansible.cfg
+                      regexp: "private_key_file"
+                      line: "private_key_file = /home/{{ ansible_username }}/.ssh/id_rsa"
+
+                  - name: Update Config with Host Key Check Setting
+                    lineinfile:
+                      owner: "{{ ansible_username }}"
+                      path: /etc/ansible/ansible.cfg
+                      regexp: "host_key_checking"
+                      line: "host_key_checking = False"
+
+                  - name: Enable Password Based Auth
+                    become: true
+                    lineinfile:
+                      path: /etc/ssh/sshd_config
+                      state: present
+                      regexp: "PasswordAuthentication no"
+                      line: "PasswordAuthentication yes"
+
+                  - name: Restart SSHD
+                    become: True
+                    systemd:
+                      name: sshd
+                      state: restarted
+
+                  - name: Send Ansible Public Key to Slack
+                    uri:
+                      method: POST
+                      url: "{{ slack_notification_webhook }}"
+                      body: {"text": "Your ansible public key is ```{{ slack_notification_content | regex_replace('ansible-generated on.*') }}```"}
+                      body_format: json
+
+        runcmd:
+          - ansible-playbook --connection=local --inventory 127.0.0.1, /etc/ansible/playbooks/ansible.yml
+      networks:
+        - name: '${resource.Cloud_Network_1.name}'
+          network: '${resource.Cloud_Network_1.id}'
+  Cloud_Network_1:
+    type: Cloud.Network
+    properties:
+      name: net1
+      networkType: existing
