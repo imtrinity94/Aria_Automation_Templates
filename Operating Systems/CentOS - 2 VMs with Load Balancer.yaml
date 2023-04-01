@@ -1,0 +1,103 @@
+name: NSX-T
+description: Description
+inputs:
+  ae_application:
+    type: string
+    title: Application Name
+resources:
+  Cloud_SecurityGroup_2:
+    type: Cloud.SecurityGroup
+    metadata:
+      layoutPosition:
+        - 1
+        - 2
+    properties:
+      constraints:
+        - tag: 'sg:app'
+      securityGroupType: existing
+  Cloud_SecurityGroup_1:
+    type: Cloud.SecurityGroup
+    metadata:
+      layoutPosition:
+        - 1
+        - 3
+    properties:
+      constraints:
+        - tag: 'sg:db'
+      securityGroupType: existing
+  Cloud_LoadBalancer_1:
+    type: Cloud.LoadBalancer
+    metadata:
+      layoutPosition:
+        - 2
+        - 1
+    properties:
+      name: cloud_loadbalancer_1
+      routes:
+        - protocol: HTTP
+          port: '80'
+          instanceProtocol: HTTP
+          instancePort: '80'
+          healthCheckConfiguration:
+            protocol: HTTP
+            port: '80'
+            urlPath: /index.html
+            intervalSeconds: 6
+            timeoutSeconds: 5
+            unhealthyThreshold: 2
+            healthyThreshold: 2
+      internetFacing: true
+      network: '${resource.int_net.id}'
+      instances: '${resource.Web_App[*].id}'
+  Web_App:
+    type: Cloud.Machine
+    dependsOn:
+      - mysql
+    metadata:
+      layoutPosition:
+        - 2
+        - 2
+    properties:
+      Infoblox.IPAM.Network.dnsView: default
+      Infoblox.IPAM.Network.dnsSuffix: aescclab.net
+      flavor: Linux-Small
+      image: CentOS7
+      folderName: vRA VMs
+      networks:
+        - name: '${int_net.name}'
+          network: '${resource.int_net.id}'
+          assignment: static
+          securityGroups:
+            - '${resource.Cloud_SecurityGroup_2.id}'
+      count: 1
+  mysql:
+    type: Cloud.Machine
+    metadata:
+      layoutPosition:
+        - 2
+        - 3
+    properties:
+      Infoblox.IPAM.Network.dnsView: default
+      Infoblox.IPAM.Network.dnsSuffix: aescclab.net
+      flavor: Linux-Small
+      image: CentOS7
+      folderName: vRA VMs
+      networks:
+        - name: '${int_net.name}'
+          network: '${resource.int_net.id}'
+          assignment: static
+          securityGroups:
+            - '${resource.Cloud_SecurityGroup_1.id}'
+  int_net:
+    type: Cloud.NSX.Network
+    metadata:
+      layoutPosition:
+        - 3
+        - 0
+    properties:
+      name: int_net
+      networkType: existing
+      constraints:
+        - tag: 'cloud:onprem'
+        - tag: 'site:scc'
+        - tag: 'network:general'

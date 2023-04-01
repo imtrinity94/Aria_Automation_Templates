@@ -1,0 +1,27 @@
+formatVersion: 1
+inputs:
+  disk1Size:
+    type: integer
+    title: Disk1 Size
+    default: 0
+  disk2Size:
+    type: integer
+    title: Disk2 Size
+    default: 0
+resources:
+  Cloud_Volume_2:
+    type: Cloud.Volume
+    properties:
+      capacityGb: '${input.disk2Size}'
+      count: '${input.disk2Size == 0 ? 0 : 1}'
+  Cloud_Volume_1:
+    type: Cloud.Volume
+    properties:
+      capacityGb: '${input.disk1Size}'
+      count: '${input.disk1Size == 0 ? 0 : 1}'
+  Cloud_Machine_1:
+    type: Cloud.Machine
+    properties:
+      image: ubuntu
+      flavor: small
+      attachedDisks: '${map_to_object(resource.Cloud_Volume_1[*].id + resource.Cloud_Volume_2[*].id, "source")}'

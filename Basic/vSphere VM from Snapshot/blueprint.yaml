@@ -1,0 +1,12 @@
+name: vSphere VM from Snapshot
+version: 1
+formatVersion: 1
+inputs: {}
+resources:
+  vm-1:
+    type: Cloud.vSphere.Machine
+    properties:
+      name: vm-1
+      cpuCount: 2
+      totalMemoryMB: 4096
+      imageRef: ubuntu-18.04/clean

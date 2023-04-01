@@ -1,0 +1,68 @@
+formatVersion: 1
+inputs:
+  web-count:
+    type: integer
+    title: Set Number of Web nodes
+    default: 1
+resources:
+  App:
+    type: Cloud.vSphere.Machine
+    metadata:
+      layoutPosition:
+        - 0
+        - 0
+    properties:
+      count: '${input.web-count}'
+      imageRef: CentOS-Tmp
+      cpuCount: 1
+      totalMemoryMB: 1024
+      networks:
+        - network: '${resource.Cloud_vSphere_Network_2.id}'
+  Cloud_LoadBalancer_1:
+    type: Cloud.LoadBalancer
+    metadata:
+      layoutPosition:
+        - 0
+        - 1
+    properties:
+      routes:
+        - port: 80
+          protocol: HTTP
+          instancePort: 80
+          instanceProtocol: 80
+      network: '${resource.Cloud_vSphere_Network_1.id}'
+      instances:
+        - '${resource.App.id}'
+      internetFacing: false
+  DB:
+    type: Cloud.vSphere.Machine
+    metadata:
+      layoutPosition:
+        - 0
+        - 2
+    properties:
+      imageRef: CentOS-Tmp
+      cpuCount: 1
+      totalMemoryMB: 1024
+      networks:
+        - network: '${resource.Cloud_vSphere_Network_2.id}'
+  Cloud_vSphere_Network_1:
+    type: Cloud.vSphere.Network
+    metadata:
+      layoutPosition:
+        - 1
+        - 0
+    properties:
+      networkType: public
+  Cloud_vSphere_Network_2:
+    type: Cloud.vSphere.Network
+    metadata:
+      layoutPosition:
+        - 2
+        - 0
+    properties:
+      gateway: 192.168.200.1
+      netmask: 255.255.255.0
+      prefixLength: 24
+      networkCidr: 192.168.200.1/24
+      networkType: private

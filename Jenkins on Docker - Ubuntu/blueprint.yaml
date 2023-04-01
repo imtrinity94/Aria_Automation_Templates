@@ -1,0 +1,24 @@
+name: Jenkins on Docker - Ubuntu
+version: v2
+inputs: {}
+resources:
+  Cloud_Machine_1:
+    type: Cloud.Machine
+    properties:
+      image: Ubuntu
+      flavor: small
+      constraints:
+        - tag: 'cloud:vsphere'
+      cloudConfig: |
+        runcmd:
+          - apt-get update -y 
+          - apt-get install apt-transport-https ca-certificates curl software-properties-common
+          - /usr/bin/curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+          - apt-key fingerprint 0EBFCD88 -y 
+          - add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+          - apt-get update -y 
+          - apt-get install docker-ce -y
+          - /bin/sed -i 's@ExecStart=/usr/bin/dockerd -H fd://@ExecStart=/usr/bin/dockerd -H tcp://0.0.0.0:2375 -H unix:///var/run/docker.sock@' /lib/systemd/system/docker.service
+          - /bin/systemctl daemon-reload
+          - /bin/systemctl restart docker
+          - /usr/bin/docker run -u root --rm -d -p 8080:8080 -p 50000:50000 -v jenkins-data:/var/jenkins_home -v /var/run/docker.sock:/var/run/docker.sock jenkinsci/blueocean 

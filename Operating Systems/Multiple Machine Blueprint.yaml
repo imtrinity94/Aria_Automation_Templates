@@ -1,0 +1,136 @@
+formatVersion: 1
+inputs:
+  ae_application:
+    type: string
+    title: Application Name
+  ae_site:
+    type: string
+    title: Site
+  ae_webname:
+    type: string
+    title: Web Sever Name
+  ae_appname:
+    type: string
+    title: App Server Name
+  ae_dbname:
+    type: string
+    title: DB Server Name
+  ae_clusterssize:
+    type: string
+    title: Cluster Size
+  ae_serversize:
+    type: string
+    title: Server Size
+resources:
+  WebServer:
+    type: Cloud.vSphere.Machine
+    metadata:
+      layoutPosition:
+        - 1
+        - 1
+    properties:
+      Infoblox.IPAM.Network.dnsView: default
+      Infoblox.IPAM.Network.dnsSuffix: aescclab.net
+      image: CentOS7
+      flavor: 'Linux-${input.ae_serversize}'
+      name: '${input.ae_webname}'
+      customizationSpec: Linux
+      folderName: vRA VMs
+      constraints:
+        - tag: 'cloud:onprem'
+        - tag: 'site:${input.ae_site}'
+      networks:
+        - network: '${resource.Web_Network.id}'
+          assignment: static
+          tags:
+            - key: web
+              value: tier
+            - key: '${input.ae_application}'
+              value: application
+      count: '${input.ae_clusterssize == "small" ? 1 : (input.ae_clusterssize == "medium" ? 2 : 3)}'
+  AppServer:
+    type: Cloud.vSphere.Machine
+    metadata:
+      layoutPosition:
+        - 1
+        - 2
+    properties:
+      Infoblox.IPAM.Network.dnsView: default
+      Infoblox.IPAM.Network.dnsSuffix: aescclab.net
+      image: Windows2016
+      flavor: 'Windows-${input.ae_serversize}'
+      name: '${input.ae_appname}'
+      customizationSpec: Windows
+      folderName: vRA VMs
+      constraints:
+        - tag: 'cloud:onprem'
+        - tag: 'site:${input.ae_site}'
+      networks:
+        - network: '${resource.App_Network.id}'
+          assignment: static
+          tags:
+            - key: app
+              value: tier
+            - key: '${input.ae_application}'
+              value: application
+  DatabaseServer:
+    type: Cloud.vSphere.Machine
+    metadata:
+      layoutPosition:
+        - 1
+        - 3
+    properties:
+      Infoblox.IPAM.Network.dnsView: default
+      Infoblox.IPAM.Network.dnsSuffix: aescclab.net
+      image: Windows2016
+      flavor: 'Windows-${input.ae_serversize}'
+      name: '${input.ae_dbname}'
+      customizationSpec: Windows
+      folderName: vRA VMs
+      constraints:
+        - tag: 'cloud:onprem'
+        - tag: 'site:${input.ae_site}'
+      networks:
+        - network: '${resource.DB_Network.id}'
+          assignment: static
+          tags:
+            - key: db
+              value: tier
+            - key: '${input.ae_application}'
+              value: application
+  Web_Network:
+    type: Cloud.NSX.Network
+    metadata:
+      layoutPosition:
+        - 2
+        - 0
+    properties:
+      networkType: existing
+      constraints:
+        - tag: 'cloud:onprem'
+        - tag: 'site:${input.ae_site}'
+        - tag: 'network:web'
+  App_Network:
+    type: Cloud.NSX.Network
+    metadata:
+      layoutPosition:
+        - 3
+        - 0
+    properties:
+      networkType: existing
+      constraints:
+        - tag: 'cloud:onprem'
+        - tag: 'site:${input.ae_site}'
+        - tag: 'network:app'
+  DB_Network:
+    type: Cloud.NSX.Network
+    metadata:
+      layoutPosition:
+        - 4
+        - 0
+    properties:
+      networkType: existing
+      constraints:
+        - tag: 'cloud:onprem'
+        - tag: 'site:${input.ae_site}'
+        - tag: 'network:db'

@@ -1,0 +1,23 @@
+name: Docker Host Build - Ubuntu
+version: v2
+inputs: {}
+resources:
+  Cloud_Machine_1:
+    type: Cloud.Machine
+    properties:
+      image: Ubuntu
+      flavor: small
+      constraints:
+        - tag: 'cloud:vsphere'
+      cloudConfig: |
+        runcmd:
+          - apt-get update -y 
+          - apt-get install apt-transport-https ca-certificates curl software-properties-common
+          - /usr/bin/curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+          - apt-key fingerprint 0EBFCD88 -y 
+          - add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+          - apt-get update -y 
+          - apt-get install docker-ce -y
+          - /bin/sed -i 's@ExecStart=/usr/bin/dockerd -H fd://@ExecStart=/usr/bin/dockerd -H tcp://0.0.0.0:2375 -H unix:///var/run/docker.sock@' /lib/systemd/system/docker.service
+          - /usr/bin/systemctl daemon-reload
+          - /usr/bin/systemctl restart docker

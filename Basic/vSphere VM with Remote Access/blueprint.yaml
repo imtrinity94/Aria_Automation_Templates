@@ -1,0 +1,38 @@
+name: vSphere VM with Remote Access
+version: 1
+formatVersion: 1
+inputs:
+  username:
+    type: string
+    title: Username
+    description: The name of the user account
+    default: vmware
+  password:
+    type: string
+    title: Password
+    default: VMware1!
+    encrypted: true
+    description: The password for the given username
+resources:
+  vm-1:
+    type: Cloud.vSphere.Machine
+    properties:
+      name: vm-1
+      cpuCount: 1
+      totalMemoryMB: 1024
+      imageRef: ubuntu-18.04
+      cloudConfig: |
+        ssh_pwauth: yes
+        chpasswd:
+          list: |
+            ${input.username}:${input.password}
+          expire: false
+        users:
+          - default
+          - name: ${input.username}
+            lock_passwd: false
+            sudo: ['ALL=(ALL) NOPASSWD:ALL']
+            groups: [wheel, sudo, admin]
+            shell: '/bin/bash'
+        runcmd:
+          - echo "Defaults:${input.username}  !requiretty" >> /etc/sudoers.d/${input.username}

@@ -1,0 +1,127 @@
+name: 3 Tier Demo Application
+version: 1
+formatVersion: 1
+inputs:
+  environment:
+    type: string
+    enum:
+      - AWS
+      - vSphere
+      - Azure
+      - VMC
+      - GCP
+    default: vSphere
+  sshKey:
+    type: string
+    encrypted: true
+  envsize:
+    type: string
+    enum:
+      - Small
+      - Large
+resources:
+  frontend:
+    type: Cloud.Machine
+    properties:
+      cloudConfigSettings:
+        phoneHomeShouldWait: true
+        phoneHomeTimeoutSeconds: 600
+        phoneHomeFailOnTimeout: true
+      folderName: '${input.environment == "VMC" ? "Workload" : ""}'
+      image: ubuntu
+      flavor: medium
+      count: '${input.envsize == "Small" ? 1 : 2}'
+      remoteAccess:
+        authentication: publicPrivateKey
+        sshKey: '${input.sshKey}'
+      cloudConfig: |
+        packages:
+          - nginx
+        runcmd:
+          - git clone https://github.com/codyde/cmbu-bootcamp-app && mkdir /tmp/app-frontend
+          - mv /cmbu-bootcamp-app/frontend-tier/* /tmp/app-frontend && cd /tmp/app-frontend
+          - curl -sL https://deb.nodesource.com/setup_10.x | sudo bash -
+          - apt install nodejs -y
+          - npm install -g @angular/cli
+          - npm install
+          - ng build --prod
+          - cp nginx/default.conf /etc/nginx/conf.d/
+          - rm -rf /usr/share/nginx/html/*
+          - cp -R /tmp/app-frontend/dist/cmbu-bootcamp-app/* /usr/share/nginx/html/
+          - sed -i "s@root /var/www/html@root /usr/share/nginx/html@" /etc/nginx/sites-available/default
+          - cp /tmp/cas-demo-application/nginx/default.conf /etc/nginx/conf.d/default.conf
+          - sed -i "s@pyapi@${resource.apitier.networks[0].address}@" /etc/nginx/conf.d/default.conf
+          - rm -rf /etc/nginx/sites-available/default
+          - sed -i "s@include /etc/nginx/sites-enabled/*@# include /etc/nginx/sites-enabled/*@" /etc/nginx/nginx.conf
+          - systemctl restart nginx
+      constraints:
+        - tag: '${"env:" + to_lower(input.environment)}'
+  apitier:
+    type: Cloud.Machine
+    properties:
+      folderName: '${input.environment == "VMC" ? "Workload" : ""}'
+      image: ubuntu
+      flavor: small
+      remoteAccess:
+        authentication: publicPrivateKey
+        sshKey: '${input.sshKey}'
+      cloudConfig: |
+        packages:
+          - python3-dev
+          - build-essential
+          - libssl-dev
+          - libffi-dev
+          - python3-setuptools
+        runcmd: 
+          - add-apt-repository universe
+          - apt update -y
+          - apt install -y python-pip
+          - apt install -y python3-pip
+          - ufw allow 80
+          - git clone https://github.com/codyde/cmbu-bootcamp-app && mkdir /tmp/api-tier
+          - mv /cmbu-bootcamp-app/app-tier/* /tmp/api-tier && cd /tmp/api-tier
+          - pip3 install -r /tmp/api-tier/requirements.txt
+          - pip install git+https://github.com/Supervisor/supervisor@master
+          - mkdir /app && cp app/* /app
+          - cp app.conf /usr/supervisord.conf
+          - cp -r ./caspyr /app/caspyr
+          - sed -i "s@host=db@host=${resource.db.networks[0].address}@" /app/main.py
+          - sed -i "s@user=postgres password=postgres_password@user=dbuser password=dbpassword@" /app/main.py
+          - supervisord -c /usr/supervisord.conf
+      constraints:
+        - tag: '${"env:" + to_lower(input.environment)}'
+  db:
+    type: Cloud.Machine
+    properties:
+      folderName: '${input.environment == "VMC" ? "Workload" : ""}'
+      image: ubuntu
+      flavor: small
+      remoteAccess:
+        authentication: publicPrivateKey
+        sshKey: '${input.sshKey}'
+      cloudConfig: |
+        packages:
+        - postgresql
+        runcmd:
+        - |
+          sudo -u postgres psql <<SQL
+            CREATE DATABASE posts;
+            CREATE USER dbuser with encrypted password 'dbpassword';
+            grant all privileges on database posts to dbuser;
+            \connect posts;
+            CREATE TABLE textData (
+            id        SERIAL PRIMARY KEY,
+            title       TEXT,
+            text        TEXT
+            );
+            ALTER DATABASE posts OWNER TO dbuser;
+            ALTER TABLE textData OWNER TO dbuser;
+          SQL
+        - echo "Restarting Postgres Services"
+        - [ systemctl, stop, postgresql.service ]
+        - ufw allow 5432
+        - echo "host    all    all       0.0.0.0/0   md5" >> /etc/postgresql/10/main/pg_hba.conf
+        - echo "listen_addresses = '*'" >> /etc/postgresql/10/main/postgresql.conf
+        - [ systemctl, start, postgresql.service ]
+      constraints:
+        - tag: '${"env:" + to_lower(input.environment)}'

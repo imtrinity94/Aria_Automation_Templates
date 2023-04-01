@@ -1,0 +1,13 @@
+name: vSphere Disk
+version: 1
+formatVersion: 1
+inputs: {}
+resources:
+  hdd-1:
+    type: Cloud.vSphere.Disk
+    properties:
+      name: disk-1
+      type: HDD
+      capacityGb: 10
+      dataStore: 'NFS'
+      provisioningType: thin

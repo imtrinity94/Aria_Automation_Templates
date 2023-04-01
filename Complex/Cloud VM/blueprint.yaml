@@ -1,0 +1,300 @@
+inputs:
+  VM_CLOUD_TARGET:
+    title: Cloud Target
+    type: string
+    default: ''
+    description: Select a Cloud Target where the VM will be provisioned
+  VM_HOSTNAME:
+    title: Hostname
+    type: string
+    description: 'Enter Hostname for the VM. Alphanumeric Only format and dash -. Max Length: 15, Min Length: 5, Cannot start or end with: -'
+    minLength: 5
+    maxLength: 15
+    pattern: '^[a-zA-Z0-9][a-zA-Z0-9\-]{1,11}[a-zA-Z0-9]$'
+  VM_CPU_COUNT:
+    title: CPU
+    type: integer
+    maximum: 128
+    minimum: 1
+    default: 1
+    enum:
+      - 1
+      - 2
+      - 4
+      - 8
+      - 12
+      - 16
+      - 20
+      - 24
+      - 28
+      - 32
+      - 36
+      - 40
+      - 44
+      - 48
+      - 52
+      - 56
+      - 60
+      - 64
+      - 68
+      - 72
+      - 76
+      - 80
+      - 84
+      - 88
+      - 92
+      - 96
+      - 100
+      - 104
+      - 108
+      - 112
+      - 116
+      - 120
+      - 124
+      - 128
+    description: Select the number of vCPU
+  VM_MEMORY:
+    title: Memory (GB)
+    type: integer
+    maximum: 512
+    minimum: 2
+    default: 2
+    enum:
+      - 2
+      - 4
+      - 8
+      - 16
+      - 32
+      - 48
+      - 64
+      - 96
+      - 128
+      - 160
+      - 192
+      - 224
+      - 256
+      - 288
+      - 320
+      - 352
+      - 384
+      - 416
+      - 448
+      - 512
+    description: Select the amount of Memory (GB)
+  VM_CUST_NETWORK:
+    title: Customer Network
+    type: string
+    description: Select a Customer Network
+  VM_SECURITY_GROUP:
+    title: Security Group
+    type: string
+    description: Select the security group to assign to the VM
+    default: default_no_access
+  VM_IMAGE:
+    title: Operating Systems
+    type: string
+    description: Select an Operating System
+  OS_License_Provided_By:
+    title: OS License Provided By
+    type: string
+    enum:
+      - Provider
+      - Customer
+    default: Provider
+    description: Select who will provide the OS License
+  VM_OS_DISK_STORAGE_TIER:
+    title: System Disk Performance Tier
+    type: string
+    description: Select the Storage Performance Tier for the System Disk
+    default: ''
+  VM_OS_DISK_STORAGE_CAPACITY:
+    maximum: 2048
+    minimum: 80
+    title: Size of System Disk (GB)
+    type: integer
+    default: 80
+    description: Enter the size for the System (OS) Disk between 80 and 2048
+  VM_ADD_DISK_COUNT:
+    enum:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+      - 11
+      - 12
+      - 13
+      - 14
+    title: Number of Data Disks
+    type: integer
+    description: Select the number of data disks
+    default: 0
+  VM_ADD_DISK_STORAGE_TIER:
+    title: Data Disks Performance Tier
+    type: string
+    default: ''
+    description: Select the Storage Performance Tier for the Data Disks
+  VM_ADD_DISK_CAPACITY:
+    maximum: 2048
+    minimum: 5
+    title: Size of Data Disks (GB)
+    type: integer
+    default: 5
+    description: Enter the size for the Data Disks between 5 and 2048
+  OS_Patching:
+    type: boolean
+    description: Check to enable OS Patching
+    default: false
+    title: Managed Options (OS Patching)
+  OS_Patching_Window:
+    type: integer
+    enum:
+      - 1
+      - 2
+      - 3
+    description: Select the patching window
+    default: 1
+    title: Managed Options (OS Patching Window)
+  OS_Patching_Pause:
+    type: boolean
+    description: Check to pause OS patching. OS Patching can resume by updating this feature against the service instance.
+    default: false
+    title: Managed Options (OS Patching Pause)
+  End_Point_Protection:
+    type: boolean
+    description: Check to enable Endpoint Protection
+    default: false
+    title: Managed Options (Endpoint protection)
+  OS_Monitoring:
+    type: boolean
+    description: Check to enable OS level monitoring
+    default: false
+    title: Managed Options (OS Monitoring)
+  VM_USERADMIN:
+    title: User Account (Username)
+    type: string
+    description: Enter a username
+  VM_USER_DESCRIPTION:
+    title: User Account (Description)
+    type: string
+    description: Enter a user description
+    default: ''
+  VM_USERNAME_PASSWORD:
+    title: User Account (Password)
+    type: string
+    description: Enter a password
+    minLength: 0
+    maxLength: 30
+    default: ''
+  VM_USERPUBKEY:
+    title: User Account (Public Key)
+    type: string
+    default: ''
+    description: Enter a ssh public key
+resources:
+  Cloud_SecurityGroup_1:
+    type: Cloud.SecurityGroup
+    metadata:
+      layoutPosition:
+        - 0
+        - 0
+    properties:
+      name: SG1
+      securityGroupType: existing
+      constraints:
+        - tag: 'security_group:${input.VM_SECURITY_GROUP}'
+  Data_Disk:
+    type: Cloud.vSphere.Disk
+    metadata:
+      layoutPosition:
+        - 0
+        - 1
+    properties:
+      constraints:
+        - tag: 'storage_tier:${input.VM_ADD_DISK_STORAGE_TIER}:hard'
+        - tag: '!maintenance:true'
+      capacityGb: '${input.VM_ADD_DISK_CAPACITY}'
+      count: '${input.VM_ADD_DISK_COUNT}'
+  VM:
+    type: Cloud.vSphere.Machine
+    metadata:
+      layoutPosition:
+        - 0
+        - 2
+    properties:
+      name: '${input.VM_HOSTNAME}'
+      hostName: '${input.VM_HOSTNAME}'
+      cpuCount: '${input.VM_CPU_COUNT}'
+      totalMemoryMB: '${input.VM_MEMORY * 1024}'
+      image: '${input.VM_IMAGE}'
+      customizationSpec: '${input.VM_IMAGE == "Red Hat® Enterprise Linux® Server Release 7.6 (64-bit)" || input.VM_IMAGE == "Red Hat® Enterprise Linux® Server Release 6.10 (64-bit)" || input.VM_IMAGE == "Red Hat® Enterprise Linux® Server Release 7 (64-bit)" || input.VM_IMAGE == "Red Hat® Enterprise Linux® Server Release 6 (64-bit)" ? "Provider-Linux-2NIC-Custom" : ""}'
+      folderName: VMware CAS
+      VM_CLOUD_TARGET: '${input.VM_CLOUD_TARGET}'
+      end_point_protection: '${input.End_Point_Protection}'
+      VM_SECURITY_GROUP: '${input.VM_SECURITY_GROUP}'
+      OS_License_Provided_By: '${input.VM_IMAGE == "CentOS Linux 6.1 (64-bit)" || input.VM_IMAGE == "CentOS Linux 7.6 (64-bit)" ? "Customer" : "Provider"}'
+      tags:
+        - key: os_monitoring
+          value: '${input.OS_Monitoring == true ? true : false}'
+        - key: os_patching
+          value: '${input.OS_Patching == true ? true : false}'
+        - key: os_patching_window
+          value: '${input.OS_Patching_Window}'
+        - key: os_patching_pause
+          value: '${input.OS_Patching_Pause == true ? true : false}'
+        - key: end_point_protection
+          value: '${input.End_Point_Protection == true ? true : false}'
+      networks:
+        - name: '${Management_Network.name}'
+          assignment: dynamic
+          deviceIndex: 0
+          network: '${resource.Management_Network.id}'
+        - name: '${Customer_Network.name}'
+          assignment: dynamic
+          deviceIndex: 1
+          network: '${resource.Customer_Network.id}'
+          securityGroups:
+            - '${resource.Cloud_SecurityGroup_1.id}'
+      constraints:
+        - tag: '${trim(input.VM_CLOUD_TARGET) == "" ? "" : "cloud_target:" + input.VM_CLOUD_TARGET}'
+        - tag: 'memmax:${input.VM_MEMORY > 256 ? 512 : 256 }'
+        - tag: 'cpumax:${input.VM_CPU_COUNT > 48 ? 128 : 48}'
+        - tag: '!maintenance:true'
+      storage:
+        bootDiskCapacityInGB: '${input.VM_OS_DISK_STORAGE_CAPACITY}'
+        constraints:
+          - tag: '${trim(input.VM_OS_DISK_STORAGE_TIER) == "" ? "" : "storage_tier:" + input.VM_OS_DISK_STORAGE_TIER}'
+          - tag: '!maintenance:true'
+      attachedDisks: '${map_by(resource.Data_Disk.id, id => {"source":id})}'
+  Management_Network:
+    type: Cloud.Network
+    metadata:
+      layoutPosition:
+        - 1
+        - 0
+    properties:
+      name: Management
+      id: 0
+      constraints:
+        - tag: internal
+        - tag: '!maintenance:true'
+      networkType: existing
+  Customer_Network:
+    type: Cloud.Network
+    metadata:
+      layoutPosition:
+        - 2
+        - 0
+    properties:
+      name: Customer Network
+      id: 1
+      constraints:
+        - tag: 'net_external:${input.VM_CUST_NETWORK}'
+        - tag: '!maintenance:true'
+      networkType: existing

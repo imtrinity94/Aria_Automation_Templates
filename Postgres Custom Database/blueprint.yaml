@@ -1,0 +1,45 @@
+name: Postgres Custom database
+version: v1
+inputs: {}
+resources:
+  Postgresql:
+    type: Cloud.Machine
+    properties:
+      constraints:
+        - tag: 'cloud:vsphere'
+      image: Ubuntu
+      flavor: small
+      networks:
+        - name: '${Default.name}'
+      cloudConfig: |
+        #cloud-config
+        packages:
+          - postgresql
+        runcmd:
+          - |
+              sudo -u postgres psql <<SQL
+                  CREATE DATABASE posts;
+                  CREATE USER dbuser with encrypted password 'VMware1!';
+                  grant all privileges on database posts to dbuser;
+                  \connect posts;
+                  CREATE TABLE textData (
+                  id        SERIAL PRIMARY KEY,
+                  title       TEXT,
+                  text        TEXT
+                  );
+                  ALTER DATABASE posts OWNER TO dbuser;
+                  ALTER TABLE textData OWNER TO dbuser;
+              SQL
+          - echo "Restarting Postgres Services"
+          - [ systemctl, stop, postgresql.service ]
+          - ufw allow 5432
+          - echo "host    all    all       0.0.0.0/0   md5" >> /etc/postgresql/9.5/main/pg_hba.conf
+          - echo "listen_addresses = '*'" >> /etc/postgresql/9.5/main/postgresql.conf
+          - [ systemctl, start, postgresql.service ]
+  Default:
+    type: Cloud.Network
+    properties:
+      name: Default
+      networkType: existing
+      constraints:
+        - tag: 'vsphere:compute'

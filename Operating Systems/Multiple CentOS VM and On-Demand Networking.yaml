@@ -1,0 +1,76 @@
+formatVersion: 1
+inputs:
+  ae_networkname:
+    type: string
+    title: Network Name
+  ae_site:
+    type: string
+    title: Site
+  ae_webname:
+    type: string
+    title: Web Sever Name
+  ae_appname:
+    type: string
+    title: App Server Name
+  ae_dbname:
+    type: string
+    title: DB Server Name
+  #  ae_clusterssize:
+  #    type: string
+  #    title: Cluster Size
+  #    default: small
+  ae_serversize:
+    type: string
+    title: Server Size
+  ae_application:
+    type: string
+    title: Application Name
+resources:
+  CentOS1:
+    type: Cloud.vSphere.Machine
+    metadata:
+      layoutPosition:
+        - 0
+        - 1
+    properties:
+      image: CentOS7
+      flavor: 'Linux-${input.ae_serversize}'
+      name: '${input.ae_webname}'
+      customizationSpec: Linux
+      folderName: vRA VMs
+      constraints:
+        - tag: 'cloud:onprem'
+        - tag: 'site:${input.ae_site}'
+      networks:
+        - network: '${resource.OD_Network.id}'
+          assignment: static
+  CentOS2:
+    type: Cloud.vSphere.Machine
+    metadata:
+      layoutPosition:
+        - 0
+        - 2
+    properties:
+      image: CentOS7
+      flavor: 'Linux-${input.ae_serversize}'
+      name: '${input.ae_appname}'
+      customizationSpec: Linux
+      folderName: vRA VMs
+      constraints:
+        - tag: 'cloud:onprem'
+        - tag: 'site:${input.ae_site}'
+      networks:
+        - network: '${resource.OD_Network.id}'
+          assignment: static
+  OD_Network:
+    type: Cloud.NSX.Network
+    metadata:
+      layoutPosition:
+        - 1
+        - 0
+    properties:
+      name: '${input.ae_networkname}'
+      networkType: routed
+      constraints:
+        - tag: 'cloud:onprem'
+        - tag: 'site:${input.ae_site}'

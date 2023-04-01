@@ -1,0 +1,13 @@
+name: vSphere VM (Customized)
+version: 1
+formatVersion: 1
+inputs: {}
+resources:
+  vm-1:
+    type: Cloud.vSphere.Machine
+    properties:
+      name: vm-1
+      cpuCount: 1
+      totalMemoryMB: 1024
+      imageRef: ubuntu-18.04
+      customizationSpec: Linux

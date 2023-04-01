@@ -1,0 +1,81 @@
+formatVersion: 1
+inputs:
+  ae_application:
+    type: string
+    title: Application Name
+  ae_site:
+    type: string
+    title: Site
+  ae_serversize:
+    type: string
+    title: Server Size
+  ae_osversion:
+    type: string
+    default: CentOS8
+    title: OS Version
+  ae_hostname:
+    type: string
+    title: Hostname
+  ae_serverfunction:
+    type: string
+    title: Server Function
+  ae_username:
+    type: string
+  ae_password:
+    type: string
+resources:
+  Cloud_vSphere_Machine_1:
+    type: Cloud.vSphere.Machine
+    metadata:
+      layoutPosition:
+        - 0
+        - 0
+    properties:
+      Infoblox.IPAM.Network.dnsView: default
+      Infoblox.IPAM.Network.dnsSuffix: aescclab.net
+      ae_hostname: '${input.ae_hostname}'
+      ae_serverfunction: '${input.ae_serverfunction}'
+      image: '${input.ae_osversion}'
+      flavor: '${input.ae_serversize}'
+      name: '${input.ae_hostname}'
+      customizationSpec: Linux
+      folderName: vRA VMs
+      cloudConfig: |
+        ssh_pwath: yes
+        chpasspwd:
+          list: |
+            ${input.ae_username}:${input.ae_password}
+          expire: false
+        users:
+          - default
+          - name: ${input.ae_username}
+            lock_passwd: false
+            sudo: ['ALL=(ALL) NOPASSWD:ALL']
+            groups: [wheel, sudo, admin]
+            shell: '/bin/bash'
+        runcmd:
+          - echo "Defaults:${input.ae_username} !requiretty" >> /etc/sudoers.d/${input.ae_username}
+          - sh -c ${'\'echo \"Welcome to Demo! This machine was requested by ' + env.requestedBy + '\\n\\n\" > /etc/motd\''}
+      constraints:
+        - tag: 'cloud:onprem'
+        - tag: 'site:${input.ae_site}'
+      networks:
+        - network: '${resource.Cloud_vSphere_Network_1.id}'
+          assignment: static
+          tags:
+            - key: '${input.ae_serverfunction}'
+              value: tier
+            - key: '${input.ae_application}'
+              value: application
+  Cloud_vSphere_Network_1:
+    type: Cloud.NSX.Network
+    metadata:
+      layoutPosition:
+        - 1
+        - 0
+    properties:
+      networkType: existing
+      constraints:
+        - tag: 'cloud:onprem'
+        - tag: 'site:${input.ae_site}'
+        - tag: 'network:${input.ae_serverfunction}'

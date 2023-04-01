@@ -1,0 +1,50 @@
+# Multiple VMs of multiple sizes with existing NSX-T LB
+formatVersion: 1
+inputs:
+  flavor:
+    type: string
+    enum:
+      - Small
+      - Medium
+    description: Select VM size
+    default: Small
+    title: Please select VM size
+  VMCount:
+    type: integer
+    minimum: 1
+    maximum: 5
+    default: '1'
+    title: Please select amount of VMS
+resources:
+  Cloud_NSX_LoadBalancer_1:
+    type: Cloud.NSX.LoadBalancer
+    properties:
+      routes:
+        - port: '80'
+          protocol: HTTP
+          healthCheckConfiguration:
+            port: '80'
+            protocol: HTTP
+            intervalSeconds: 5
+            timeoutSeconds: 15
+            unhealthyThreshold: 5
+            healthyThreshold: 2
+      network: '${resource.Cloud_NSX_Network_1.id}'
+      instances: '${resource.Cloud_vSphere_Machine_1.id}'
+      internetFacing: false
+  Cloud_NSX_Network_1:
+    type: Cloud.NSX.Network
+    properties:
+      networkType: existing
+  Cloud_vSphere_Machine_1:
+    type: Cloud.vSphere.Machine
+    properties:
+      image: SRV19-Template
+      flavor: '${input.flavor}'
+      count: '${input.VMCount}'
+      customizationSpec: SRV16
+      constraints: 
+        - tag: prod
+      networks: 
+        - name: '${resource.Cloud_NSX_Network_1.id}'
+          assignment: static

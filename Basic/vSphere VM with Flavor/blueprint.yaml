@@ -1,0 +1,11 @@
+name: vSphere VM with Flavor
+version: 1
+formatVersion: 1
+inputs: {}
+resources:
+  vm-1:
+    type: Cloud.vSphere.Machine
+    properties:
+      name: vm-1
+      flavor: small
+      imageRef: ubuntu-18.04

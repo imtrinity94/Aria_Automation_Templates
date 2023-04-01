@@ -1,0 +1,76 @@
+formatVersion: 1
+inputs:
+  ae_application:
+    type: string
+    title: Application Name
+  ae_networkname:
+    type: string
+    title: Network Name
+  ae_hostname:
+    type: string
+    title: Hostname
+  ae_serverfunction:
+    type: string
+    title: Server Function
+  ae_site:
+    type: string
+    title: Site
+  ae_enivronment:
+    type: string
+    title: Environment
+  ae_ostype:
+    type: string
+    title: Operating System
+  ae_hostnamesuffix:
+    type: string
+    title: Hostname Suffix
+  ae_serversize:
+    type: string
+    title: Server Size
+resources:
+  Cloud_vSphere_Machine_1:
+    type: Cloud.vSphere.Machine
+    metadata:
+      layoutPosition:
+        - 0
+        - 1
+    properties:
+      Infoblox.IPAM.Network.dnsView: default
+      Infoblox.IPAM.Network.dnsSuffix: aescclab.net
+      ae_serverfunction: '${input.ae_serverfunction}'
+      ae_enivronment: '${input.ae_enivronment}'
+      ae_site: '${input.ae_site}'
+      ae_ostype: '${input.ae_ostype}'
+      ae_hostnamesuffix: '${input.ae_hostname}'
+      ae_serversize: '${input.ae_serversize}'
+      image: Windows2016
+      flavor: '${input.ae_serversize}'
+      name: '${input.ae_hostname}'
+      customizationSpec: Windows
+      folderName: vRA VMs
+      tags:
+        - key: OS Type
+          value: WINDOWS
+      constraints:
+        - tag: 'cloud:onprem'
+        - tag: 'site:${input.ae_site}'
+      networks:
+        - network: '${resource.Cloud_vSphere_Network_1.id}'
+          assignment: static
+  #          tags:
+  #            - key: '${input.ae_serverfunction}'
+  #              value: tier
+  #            - key: '${input.ae_application}'
+  #              value: application
+  Cloud_vSphere_Network_1:
+    type: Cloud.NSX.Network
+    metadata:
+      layoutPosition:
+        - 1
+        - 0
+    properties:
+      name: '${input.ae_networkname}'
+      networkType: routed
+      constraints:
+        - tag: 'cloud:onprem'
+        - tag: 'site:${input.ae_site}'

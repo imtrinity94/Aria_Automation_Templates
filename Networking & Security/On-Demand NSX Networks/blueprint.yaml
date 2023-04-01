@@ -1,0 +1,45 @@
+name: On-Demand NSX Networks
+version: 1
+formatVersion: 1
+inputs:
+  primaryNetworkType:
+    type: string
+    title: Private network type
+    default: routed
+    enum:
+      - outbound
+      - private
+      - routed
+  backupNetworkType:
+    type: string
+    title: Backup network type
+    default: routed
+    enum:
+      - outbound
+      - private
+      - routed
+resources:
+  Cloud_NSX_Network_1:
+    type: Cloud.NSX.Network
+    properties:
+      networkType: '${input.primaryNetworkType}'
+      constraints:
+        - tag: 'netprofile:primary'
+      tags:
+        - key: net
+          value: primary
+        - key: netprofile
+          value: common
+      description: Primary network
+  Cloud_NSX_Network_2:
+    type: Cloud.NSX.Network
+    properties:
+      networkType: '${input.backupNetworkType}'
+      constraints:
+        - tag: 'netprofile:backup'
+      tags:
+        - key: net
+          value: backup
+        - key: netprofile
+          value: common
+      description: Backup network

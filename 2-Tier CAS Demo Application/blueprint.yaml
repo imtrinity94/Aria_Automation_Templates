@@ -1,0 +1,98 @@
+name: 2-Tier CAS Demo Application
+version: 4
+formatVersion: 1
+inputs:
+  environment:
+    type: string
+    enum:
+      - AWS
+      - vSphere
+      - Azure
+      - VMC
+      - GCP
+    default: vSphere
+  sshKey:
+    type: string
+    encrypted: true
+  envsize:
+    type: string
+    enum:
+      - Small
+      - Large
+resources:
+  Cloud_LoadBalancer_1:
+    type: Cloud.LoadBalancer
+    properties:
+      count: '${input.envsize == "Small" ? 0 : 1}'
+      name: lb
+      routes:
+        - port: '80'
+          protocol: http
+          instancePort: '80'
+          instanceProtocol: http
+      network: '${resource.Cloud_Network_1.name}'
+      instances:
+        - '${resource.frontend.id}'
+      internetFacing: false
+  frontend:
+    type: Cloud.Machine
+    properties:
+      folderName: '${input.environment == "VMC" ? "Workload" : ""}'
+      image: ubuntu
+      flavor: medium
+      count: '${input.envsize == "Small" ? 1 : 2}'
+      remoteAccess:
+        authentication: publicPrivateKey
+        sshKey: '${input.sshKey}'
+      cloudConfig: |
+        runcmd:
+          - echo ${resource.apitier.networks[0].address}
+          - apt install -y nginx 
+          - /usr/bin/git clone https://github.com/codyde/frontend-demoapp /tmp/cas-demo-application
+          - /bin/rm -rf /etc/nginx/conf.d/*
+          - /bin/rm -rf /usr/share/nginx/html/*
+          - /usr/bin/curl -sL https://deb.nodesource.com/setup_10.x | sudo bash -
+          - /usr/bin/apt install nodejs -y
+          - /usr/bin/npm install -g @angular/cli
+          - cd /tmp/cas-demo-application && /usr/bin/npm install
+          - /usr/bin/ng build --prod
+          - /bin/cp -R /tmp/cas-demo-application/dist/cas-demo-app/* /usr/share/nginx/html/
+          - /bin/sed -i "s@root /var/www/html@root /usr/share/nginx/html@" /etc/nginx/sites-available/default
+          - /bin/cp /tmp/cas-demo-application/nginx/default.conf /etc/nginx/conf.d/default.conf
+          - /bin/sed -i "s@pyapi@${resource.apitier.networks[0].address}@" /etc/nginx/conf.d/default.conf
+          - /bin/rm -rf /etc/nginx/sites-available/default
+          - /bin/sed -i "s@include /etc/nginx/sites-enabled/*@# include /etc/nginx/sites-enabled/*@" /etc/nginx/nginx.conf
+          - /bin/systemctl restart nginx
+      constraints:
+        - tag: '${"env:" + to_lower(input.environment)}'
+      networks:
+        - name: '${resource.Cloud_Network_1.name}'
+  apitier:
+    type: Cloud.Machine
+    properties:
+      folderName: '${input.environment == "VMC" ? "Workload" : ""}'
+      image: ubuntu
+      flavor: small
+      cloudConfig: |
+        runcmd: 
+          - add-apt-repository universe
+          - apt update -y
+          - apt install -y python3-pip python3-dev build-essential libssl-dev libffi-dev python3-setuptools supervisor
+          - pip3 install gunicorn flask flask_cors requests
+          - ufw allow 80
+          - git clone https://github.com/codyde/api-tier-demoapp /app
+          - cp /app/app.conf /etc/supervisor/conf.d/app.conf
+          - supervisorctl reread
+          - systemctl restart supervisor
+          - supervisorctl status
+      constraints:
+        - tag: '${"env:" + to_lower(input.environment)}'
+      networks:
+        - name: '${resource.Cloud_Network_1.name}'
+  Cloud_Network_1:
+    type: Cloud.Network
+    properties:
+      name: Default
+      networkType: existing
+      constraints:
+        - tag: '${"env:" + to_lower(input.environment)}'

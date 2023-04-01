@@ -1,0 +1,22 @@
+name: vSphere VM with Disk
+version: 1
+formatVersion: 1
+inputs: {}
+resources:
+  hdd-1:
+    type: Cloud.vSphere.Disk
+    properties:
+      name: disk-1
+      type: HDD
+      capacityGb: 10
+      dataStore: 'NFS'
+      provisioningType: thin
+  vm-1:
+    type: Cloud.vSphere.Machine
+    properties:
+      name: vm-1
+      cpuCount: 1
+      totalMemoryMB: 1024
+      imageRef: ubuntu-18.04
+      attachedDisks:
+        -source: ${hdd-1.id}

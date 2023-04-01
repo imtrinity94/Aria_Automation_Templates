@@ -1,0 +1,62 @@
+name: vSphere machine with multiple NICs
+version: 1
+formatVersion: 1
+inputs: {}
+resources:
+  vm-1:
+    type: Cloud.Machine
+    properties:
+      name: vm-1
+      flavor: small
+      imageRef: ubuntu-18.04
+    networks:
+      - name: ${resource.net-1.id}
+        assignPublicIpAddress: false
+  net-1:
+    type: Cloud.vSphere.Network
+    properties:
+      networkType: existing
+      name: dhcp
+
+
+formatVersion: 1
+inputs:
+  count:
+    type: integer
+    default: 1
+resources:
+  ubuntu-vm:
+    type: Cloud.Machine
+    properties:
+      name: ubuntu
+      flavor: small
+      image: tiny
+      count: '${input.count}'
+      networks:
+        - network: '${resource.Cloud_NSX_Network_1.id}'
+  Provider_LoadBalancer_1:
+    type: Cloud.LoadBalancer
+    properties:
+      name: OC-LB
+      routes:
+        - protocol: HTTP
+          port: '80'
+          instanceProtocol: HTTP
+          instancePort: '80'
+          healthCheckConfiguration:
+            protocol: HTTP
+            port: '80'
+            urlPath: /index.html
+            intervalSeconds: 60
+            timeoutSeconds: 5
+            unhealthyThreshold: 5
+            healthyThreshold: 2
+      network: '${resource.Cloud_NSX_Network_1.id}'
+      internetFacing: false
+      instances: '${resource["ubuntu-vm"].id}'
+  Cloud_NSX_Network_1:
+    type: Cloud.NSX.Network
+    properties:
+      networkType: existing
+      constraints:
+        - tag: nsxt24prod

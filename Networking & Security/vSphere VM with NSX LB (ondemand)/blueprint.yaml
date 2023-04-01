@@ -1,0 +1,65 @@
+name: vSphere machine with multiple NICs
+version: 1
+formatVersion: 1
+inputs: {}
+resources:
+  vm-1:
+    type: Cloud.Machine
+    properties:
+      name: vm-1
+      flavor: small
+      imageRef: ubuntu-18.04
+    networks:
+      - name: ${resource.net-1.id}
+        assignPublicIpAddress: false
+  net-1:
+    type: Cloud.vSphere.Network
+    properties:
+      networkType: existing
+      name: dhcp
+
+
+inputs: {}
+resources:
+  mp-existing:
+    type: Cloud.Network
+    properties:
+      name: mp-existing
+      networkType: existing
+  mp-wordpress:
+    type: Cloud.vSphere.Machine
+    properties:
+      name: wordpress
+      count: 2
+      flavor: small
+      image: tiny
+      customizationSpec: Linux
+      networks:
+        - network: '${resource["mp-private"].id}'
+  mp-private:
+    type: Cloud.NSX.Network
+    properties:
+      name: mp-private
+      networkType: private
+      constraints:
+        - tag: nsxt
+  mp-wordpress-lb:
+    type: Cloud.LoadBalancer
+    properties:
+      name: wordpress-lb
+      internetFacing: false
+      network: '${resource.mp-existing.id}'
+      instances: '${resource["mp-wordpress"].id}'
+      routes:
+        - protocol: HTTP
+          port: '80'
+          instanceProtocol: HTTP
+          instancePort: '80'
+          healthCheckConfiguration:
+            protocol: HTTP
+            port: '80'
+            urlPath: /index.pl
+            intervalSeconds: 60
+            timeoutSeconds: 30
+            unhealthyThreshold: 5
+            healthyThreshold: 2

@@ -1,0 +1,31 @@
+formatVersion: 1
+inputs: {}
+resources:
+  Cloud_Network_1:
+    type: Cloud.Network
+    properties:
+      networkType: existing
+  Cloud_Machine_1:
+    type: Cloud.vSphere.Machine
+    properties:
+      image: windows
+      cpuCount: 2
+      totalMemoryMB: 4096
+      constraints:
+        - tag: 'env:vsphere'
+      remoteAccess:
+        authentication: usernamePassword
+        username: Administrator
+        password: VMware1!
+      cloudConfig: |
+        #cloud-config
+        write_files:
+          content: |
+            Set-Content -Path C:\test.txt -Value  ProjectName: ${env.projectName}'
+          path: C:\test.ps1
+        #ps1_sysnative
+        Add-LocalGroupMember -Group "Administrators" -Member "${env.requestedBy}"
+
+      networks:
+        - network: '${resource.Cloud_Network_1.id}'
+          assignment: static

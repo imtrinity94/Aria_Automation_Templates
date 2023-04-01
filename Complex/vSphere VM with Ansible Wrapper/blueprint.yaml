@@ -1,0 +1,23 @@
+name: vSphere VM with Ansible Wrapper
+version: 1
+formatVersion: 1
+inputs: {}
+resources:
+  Cloud_vSphere_Machine_1:
+    type: Cloud.vSphere.Machine
+    properties:
+      image: CentOS
+      cpuCount: 1
+      totalMemoryMB: 1024
+  Cloud_Ansible_1:
+    type: Cloud.Ansible
+    properties:
+      host: '${resource.Cloud_vSphere_Machine_1.*}'
+      osType: linux
+      account: Field Demo Ansible OSS
+      username: root
+      password: VMware1!
+      playbooks:
+        provision:
+          - /etc/ansible/wrapper.yml --extra-vars wrapper_limit=* wrapper_tags="test1,test2" wrapper_playbooks="/etc/ansible/test.yml /etc/ansible/test2.yml"
+      inventoryFile: /etc/ansible/hosts

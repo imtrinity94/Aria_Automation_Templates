@@ -1,0 +1,29 @@
+name: Remote Access with SSH Key 
+version: v1
+formatVersion: 1
+inputs:
+  sshkey:
+    type: string
+    title: SSHKey
+    encrypted: true
+resources:
+  web1:
+    type: Cloud.Machine
+    networks:
+      - name: '${Cloud_Network_1.name}'
+    properties:
+      count: 1
+      image: Ubuntu
+      remoteAccess:
+        authentication: publicPrivateKey
+        sshKey: '${input.sshkey}'
+      constraints:
+        - tag: 'cloud:vsphere'
+      flavor: medium
+      networks:
+        - name: '${AppNetwork.name}'
+  AppNetwork:
+    type: Cloud.Network
+    properties:
+      name: Core
+      networkType: existing

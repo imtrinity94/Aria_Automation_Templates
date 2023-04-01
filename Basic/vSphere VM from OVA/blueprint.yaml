@@ -1,0 +1,13 @@
+name: vSphere VM from OVA
+version: 1
+formatVersion: 1
+inputs: {}
+resources:
+  vm-1:
+    type: Cloud.vSphere.Machine
+    properties:
+      name: vm-1
+      cpuCount: 2
+      totalMemoryMB: 4096
+      imageRef: >-
+        https://bintray.com/vmware/photon/download_file?file_path=3.0%2FGA%2Fova%2Fphoton-hw13_uefi-3.0-26156e2.ova
