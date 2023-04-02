@@ -1,6 +1,3 @@
-### Author(s)
-  - James Wirth
-
 ### Summary
 This blueprint deploys a vSphere Event Broker Appliance (VEBA) from an .ova that
 is available via http. In this case it's hosted on an Minio based object server.

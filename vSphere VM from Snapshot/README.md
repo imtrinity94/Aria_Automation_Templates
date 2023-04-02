@@ -1,4 +1,4 @@
-# Облачная ВМ на vSphere из снапшота
+# Cloud VM on vSphere from snapshot
 
-Свойства ВМ включают те же поля, что и в блюпринте [vSphere ВМ с ЦПУ/Памятью](/Basic/vSphere VM with CPU&Mem),
-а поле `imageRef` является ссылкой на имя снимка (snapshot) шаблона ВМ. Имя снимка указывается после прямого слэша. 
+The VM properties include the same fields as in the [vSphere VM with CPU&Mem](/Basic/vSphere VM with CPU&Mem) blueprint,
+and the `imageRef` field is a reference to the snapshot name of the VM template. The snapshot name is specified after the forward slash.

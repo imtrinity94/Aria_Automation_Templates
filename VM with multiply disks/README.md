@@ -1,3 +1,3 @@
- Пример шаблона с возможностью заказать дополнительные диски в момент запроса сервиса.
- По-умолчанию, у ВМ будет только один системный диск.
- Дополнительные "удобства" для конфигурирования формы запроса потребуется сделать через Custom Forms в Service Broker.
+An example of a template with the ability to order additional disks at the time of a service request.
+  By default, the VM will have only one system disk.
+  Additional "conveniences" for configuring the request form will need to be done through Custom Forms in Service Broker.

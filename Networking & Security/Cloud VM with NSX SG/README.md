@@ -1,9 +1,9 @@
-# Облачная ВМ на vSphere, подключённая к нескольким сетям
+# Cloud VM on vSphere connected to multiple networks
 
-Свойства ВМ включают те же поля, что и в блюпринте [vSphere ВМ подключённая к сети](/Basic/vSphere VM with Net),
-а поле `networks` содержит список сетей, к которым следует подключить ВМ. Параметр `deviceIndex` определяет индекс
-сетевого адаптера внутри ВМ. Стоит обратить внимание, что в свойствах сети так же указан [тип (`networkType`) сети](https://docs.vmware.com/en/vRealize-Automation/8.0/Using-and-Managing-Cloud-Assembly/GUID-68197096-1155-49C0-8043-D6DDE4EED28E.html),
-ссылающийся на существующую сеть.
+The VM properties include the same fields as in the [vSphere VM with Net](/Basic/vSphere VM with Net) blueprint,
+and the `networks` field contains a list of networks to which the VM should be connected. The `deviceIndex` parameter defines the index
+network adapter inside the VM. It is worth noting that the network properties also indicate the [type (`networkType`) of the network](https://docs.vmware.com/en/vRealize-Automation/8.0/Using-and-Managing-Cloud-Assembly/GUID -68197096-1155-49C0-8043-D6DDE4EED28E.html),
+referencing an existing network.
 
 
 Existing security group with a constraint tag applied to a machine NIC

@@ -1,4 +1,4 @@
-Пример шаблона с балансировщиком.
-Балансирощик был использован в для задачи port translation, поскольку в vRA8 в схеме с NAT сетью реализовано только SNAT.
-Конфигурация "приватной" сети статична и она также прописана в шаблоне, а не берется из Network Profile.
-Для понимания того, как vRA8 работает с NSX смотрите серию статей: https://blogs.vmware.com/management/2019/04/network-automation-cloud-assembly-and-nsx-part-1.html
+An example of a template with a balancer.
+The balancer was used for the port translation task, since in vRA8 only SNAT is implemented in the scheme with a NAT network.
+The "private" network configuration is static and it is also written in the template, and is not taken from the Network Profile.
+For an understanding of how vRA8 works with NSX see the article series: https://blogs.vmware.com/management/2019/04/network-automation-cloud-assembly-and-nsx-part-1.html

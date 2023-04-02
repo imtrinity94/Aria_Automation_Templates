@@ -1,6 +1,3 @@
-### Author(s)
-  - Anderson Duboc
-
 ### Summary
 This blueprint creates an Harbor Host that can be used with Code Stream as a docker registry.
 It uses cloud-init to install docker and docker-compose. It alsos download the harbor binaries to install a self-signed Harbor instance with Clair to scan docker images for vulnerabilities.

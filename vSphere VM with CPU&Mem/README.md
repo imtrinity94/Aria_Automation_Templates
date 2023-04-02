@@ -1,7 +1,7 @@
-# Облачная ВМ на vSphere - базовый блюпринт
+# Cloud VM on vSphere - basic blueprint
 
-Свойства ВМ включают поля:
- - `name` - имя виртуальной машины
- - `cpuCount` - количество виртуальных процессоров (минимум = 1, по-умолчанию = 1)
- - `totalMemoryMB` - объём памяти виртуальной машины в МБ (минимум = 32, по-умолчанию = 1024) 
- - `imageRef` - [ссылка на образ](https://docs.vmware.com/en/vRealize-Automation/8.0/Using-and-Managing-Cloud-Assembly/GUID-9CBAA91A-FAAD-4409-AFFC-ACC1810E4FA5.html) из которого разворачивается виртуальная машина
+VM properties include the fields:
+ - `name` - virtual machine name
+ - `cpuCount` - number of virtual processors (minimum = 1, default = 1)
+ - `totalMemoryMB` - virtual machine memory size in MB (minimum = 32, default = 1024)
+ - `imageRef` - [image link](https://docs.vmware.com/en/vRealize-Automation/8.0/Using-and-Managing-Cloud-Assembly/GUID-9CBAA91A-FAAD-4409-AFFC-ACC1810E4FA5 .html) from which the virtual machine is deployed

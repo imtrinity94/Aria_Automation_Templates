@@ -1,2 +1,2 @@
-Пример комплексного шаблона сервиса заказа виртуальной машины со множеством входных параметров (inputs) и операций над ними.
-ВМ подключается в продуктивную сеть и сеть управления, включается в группу безопасности NSX.
+An example of a complex template for a virtual machine ordering service with many inputs and operations on them.
+The VM is connected to the production network and the management network, and is included in the NSX security group.

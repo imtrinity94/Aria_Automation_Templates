@@ -1,3 +1,3 @@
-Перед использованием обязательно:
-1)	Создать вручную пустой Load Balancer в NSX-T
-2)	Включить All LB VIP Routes и All LB VIP Routes в Route Advertisement на Т1 Router
+Be sure to:
+1) Manually create an empty Load Balancer in NSX-T
+2) Enable All LB VIP Routes and All LB VIP Routes in Route Advertisement on T1 Router

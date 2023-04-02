@@ -1,6 +1,6 @@
-# Облачная ВМ на vSphere с дополнительным диском
+# Cloud VM on vSphere with additional disk
 
-Свойства ВМ включают те же поля, что и в блюпринте [vSphere ВМ с ЦПУ/Памятью](/Basic/vSphere VM with CPU&Mem), 
-свойства диска включают те же поля, что и в блюпринте [vSphere Диск](/Basic/vSphere Disk on Datastore), 
-а связкой здесь является поле `attachedDisks` у объекта ВМ, которое ссылается на идентификатор объекта виртуального
-диска.
+The VM properties include the same fields as in the [vSphere VM with CPU&Mem](/Basic/vSphere VM with CPU&Mem) blueprint,
+the disk properties include the same fields as in the [vSphere Disk](/Basic/vSphere Disk on Datastore) blueprint,
+and the link here is the `attachedDisks` field of the VM object, which refers to the identifier of the virtual object
+disk.

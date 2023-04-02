@@ -1,4 +1,4 @@
-# Облачная ВМ на vSphere со статическим IP-адресом
+# Cloud VM on vSphere with static IP address
 
-Свойства ВМ включают те же поля, что и в блюпринте [vSphere ВМ подключённая к сети](/Basic/vSphere VM with Net),
-а список сетей `networks` содержит указание использовать статическое назначение (`assignement`) адреса ВМ.
+The VM properties include the same fields as in the [vSphere VM with Net](/Basic/vSphere VM with Net) blueprint,
+and the list of `networks` networks contains an indication to use the static assignment (`assignement`) of the VM address.

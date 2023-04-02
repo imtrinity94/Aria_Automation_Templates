@@ -1,6 +1,3 @@
-### Author(s)
-  - Grant Orchard
-
 ### Summary
 This blueprint creates a Docker host that can be used for many functions, including a valid endpoint for Codestream to use as part of its CI Workspace.
 

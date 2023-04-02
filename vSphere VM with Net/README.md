@@ -1,5 +1,4 @@
-# Облачная ВМ на vSphere, подключённая к конкретной сети
+# Cloud VM on vSphere connected to a specific network
 
-Свойства ВМ включают те же поля, что и в блюпринте [vSphere ВМ с ЦПУ/Памятью](/Basic/vSphere VM with CPU&Mem),
-а поле `networks` содержит имя сети, к которой следует подключить ВМ. Сеть описана, как `Cloud.vSphere.Network`, 
-а в свойствах сети указано её имя - `dhcp`.
+The VM properties include the same fields as in the [vSphere VM with CPU&Mem](/Basic/vSphere VM with CPU&Mem) blueprint,
+and the `networks` field contains the name of the network to which the VM should be connected. The network is described as `Cloud.vSphere.Network`, and in the properties of the network its name is specified - `dhcp`.
