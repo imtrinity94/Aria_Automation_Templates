@@ -1,0 +1,96 @@
+formatVersion: 1
+name: ALB - Web Servers
+version: 1
+resources:
+  Persistence_Profile:
+    type: Idem.AVILB.PROFILES.APPLICATION_PERSISTENCE_PROFILE
+    properties:
+      name: web-profile-${uuid()}
+      description: Managed by Aria Automation
+      account: ${resource.Allocations_CloudZone.selectedCloudAccount.name}
+      persistence_type: PERSISTENCE_TYPE_CLIENT_IP_ADDRESS
+  Allocations_CloudZone:
+    type: Allocations.CloudZone
+    properties:
+      accountType: nsx_alb
+      constraints:
+        - tag: env:dev
+  Health_Monitor:
+    type: Idem.AVILB.PROFILES.HEALTH_MONITOR
+    properties:
+      name: web-monitor-${uuid()}
+      description: Managed by Aria Automation
+      type: HEALTH_MONITOR_HTTP
+      account: ${resource.Allocations_CloudZone.selectedCloudAccount.name}
+      monitor_port: 80
+  Cloud_SecurityGroup:
+    type: Cloud.SecurityGroup
+    properties:
+      constraints:
+        - tag: env:dev
+      securityGroupType: existing
+  VIP:
+    type: Idem.AVILB.APPLICATIONS.VS_VIP
+    properties:
+      name: web-vip-${uuid()}
+      description: Managed by Aria Automation
+      account: ${resource.Allocations_CloudZone.selectedCloudAccount.name}
+      vip:
+        - vip_id: 0
+          auto_allocate_ip: true
+          ipam_network_subnet:
+            network_ref: ${resource.Cloud_vSphere_Network_1.resourceName}
+  VirtualService:
+    type: Idem.AVILB.APPLICATIONS.VIRTUAL_SERVICE
+    properties:
+      name: web-vs-${uuid()}
+      description: Managed by Aria Automation
+      account: ${resource.Allocations_CloudZone.selectedCloudAccount.name}
+      cloud_type: CLOUD_VCENTER
+      services:
+        - port: '80'
+      pool_ref: ${resource.Pool.name}
+      vsvip_ref: ${resource.VIP.name}
+  Pool:
+    type: Idem.AVILB.APPLICATIONS.POOL
+    properties:
+      name: web-pool-${uuid()}
+      description: Managed by Aria Automation
+      account: ${resource.Allocations_CloudZone.selectedCloudAccount.name}
+      default_server_port: '80'
+      application_persistence_profile_ref: /api/applicationpersistenceprofile/${resource.Persistence_Profile.resource_id}
+      health_monitor_refs: /api/healthmonitor/${resource.Health_Monitor.resource_id}
+      lb_algorithm: LB_ALGORITHM_LEAST_CONNECTIONS
+      servers: '${map_by(resource.Web_Server[*].address, address => {"ip": {"addr": address, "type" : "V4"}})}'
+  Web_Server:
+    type: Cloud.vSphere.Machine
+    properties:
+      name: web
+      count: 2
+      flavor: medium
+      imageRef: https://cloud-images.ubuntu.com/releases/18.04/release/ubuntu-18.04-server-cloudimg-amd64.ova
+      cloudConfig: |
+        packages:
+          - apache2
+          - open-vm-tools
+
+        runcmd:
+          ### update the top of the web page to the web servers resource name
+          - sed -i 's/Apache2 Ubuntu Default Page/${self.resourceName}/g' /var/www/html/index.html
+          
+          ### Restart services
+          - systemctl reload apache2
+          - systemctl restart apache2
+          
+          ### Log completion
+          - echo 'Cloud-init is done!' >> /tmp/finished.txt
+      networks:
+        - network: ${resource.Cloud_vSphere_Network_1.id}
+          #securityGroups:
+           # - ${resource.Cloud_SecurityGroup.id}
+  Cloud_vSphere_Network_1:
+    type: Cloud.vSphere.Network
+    properties:
+      networkType: existing
+      constraints:
+        - tag: net:vm
