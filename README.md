@@ -43,7 +43,7 @@ resources:
       networkType: existing
 ```
 
-## Table of Contents
+## List of Templates
 
 ### Application Templates
 - [2-Tier CAS Demo Application](./2-Tier%20CAS%20Demo%20Application) - Two-tier application deployment template
