@@ -1,8 +1,47 @@
-# Collection of vRA Cloud Assembly Cloud Templates
+# 🚀 Aria Automation Templates Collection
 
-<a href="https://app.commanddash.io/agent?github=M.Goyal/Aria_Automation_Templates"><img src="https://img.shields.io/badge/AI-Code%20Assist-EB9FDA"></a>
+Welcome to the Aria Automation Templates Collection! This repository contains a curated set of VMware Aria Automation (formerly vRealize Automation) templates for various infrastructure and application deployments.
 
-A comprehensive collection of VMware Aria Automation (formerly vRA) Cloud Assembly templates for various infrastructure and application deployments. Help make it even bigger by contributing. Built with love.
+## 🎯 Quick Start
+
+To use these templates:
+1. 📥 Clone this repository
+2. 🔄 Import the desired template into your Aria Automation environment
+3. ⚙️ Configure the template according to your environment
+4. 🚀 Deploy!
+
+## 💡 Example Template
+
+Here's a simple example of an Aria Automation template:
+
+```yaml
+formatVersion: 1
+inputs:
+  vm_name:
+    type: string
+    title: VM Name
+    default: my-vm
+  cpu_count:
+    type: integer
+    title: CPU Count
+    default: 2
+    minimum: 1
+    maximum: 8
+resources:
+  Cloud_Machine:
+    type: Cloud.vSphere.Machine
+    properties:
+      name: ${input.vm_name}
+      flavor: small
+      image: ubuntu-20.04
+      cpuCount: ${input.cpu_count}
+      networks:
+        - network: ${resource.Cloud_Network.id}
+  Cloud_Network:
+    type: Cloud.Network
+    properties:
+      networkType: existing
+```
 
 ## Table of Contents
 
