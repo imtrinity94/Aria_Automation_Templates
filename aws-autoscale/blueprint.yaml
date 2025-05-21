@@ -1,0 +1,215 @@
+#--------------------------------------------------------#
+#                     Spas Kaloferov                     #
+#                   www.kaloferov.com                    #
+# bit.ly/The-Twitter      Social     bit.ly/The-LinkedIn #
+# bit.ly/The-Gitlab        Git         bit.ly/The-Github #
+# bit.ly/The-BSD         License          bit.ly/The-GNU #
+#--------------------------------------------------------#
+info: |-
+  #
+  #       VMware Cloud Assembly Blueprint Code Sample          
+  # 
+  # - This shows Cloud Assembly integration with AWS Auto-Scale functionality. 
+  # - Sets auto-scaling group for machines, which automatically increases or decreases resources based on configured policies. 
+  # - The stress command will stress the CPU and scale-out the server
+  # - Blog: Using Cloud Assembly Native Auto-Scale Functionality (http://kaloferov.com/blog/skkb1048)
+  #
+name: AWS - AutoScale
+version: 1
+#-------------------------INPUTS-------------------------#
+inputs:
+  image:
+    type: string
+    description: Select image
+    default: centos-74-livefire-image
+    title: Image
+    oneOf:
+      - title: CentOS 7.4
+        const: centos-74-image
+      - title: CentOS 7.4 (Livefire)
+        const: centos-74-livefire-image
+  flavour:
+    type: string
+    enum:
+      - micro
+      - small
+      - medium
+      - large
+    description: |-
+      Select the size of the deployment.
+      Micro = 1 CPU - 1 GB RAM, 
+      Small =  1 CPU - 2 GB RAM, 
+      Medium = 2 CPU - 4 GB RAM, 
+      Large = 2 CPU - 8 GB RAM,
+    default: micro
+    title: Flavour (Size)
+  environment:
+    type: string
+    description: 'Select the development, testing, or production environment .'
+    default: 'cas.cloud.zone.env:dev'
+    title: Environment
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: Development
+        const: 'cas.cloud.zone.env:dev'
+      - title: Test
+        const: 'cas.cloud.zone.env:test'
+      - title: Prodiction
+        const: 'cas.cloud.zone.env:prod'
+  cloudZone:
+    type: string
+    description: Select Public CLoud.
+    default: 'cas.cloud.zone.type:aws'
+    title: Cloud
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: AWS
+        const: 'cas.cloud.zone.type:aws'
+      - title: Azure
+        const: 'cas.cloud.zone.type:azure'
+      - title: GCP
+        const: 'cas.cloud.zone.type:gcp'
+      - title: VMC
+        const: 'cas.cloud.zone.type:vmc'
+      - title: vCenter
+        const: 'cas.cloud.zone.type:vcenter'
+  cloudAccountOwner:
+    type: string
+    description: Select Public CLoud Owner.
+    default: 'cas.cloud.account.owner:elastic_sky'
+    title: Owner
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: ElasticSky
+        const: 'cas.cloud.account.owner:elastic_sky'
+  network:
+    type: string
+    description: Select Network to Attach to
+    default: 'cas.network.type:public'
+    title: Network
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: Public
+        const: 'cas.network.type:public'
+      - title: Private
+        const: 'cas.network.type:private'
+  ipAssignment:
+    type: string
+    description: Select IP Assignment Method
+    default: dynamic
+    title: IP Assignment
+    oneOf:
+      - title: Dynamic
+        const: dynamic
+      - title: Static
+        const: static
+  storageTier:
+    type: string
+    description: Select Storage Tier
+    default: 'cas.storage.profile.tier:silver'
+    title: Storage Tier
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: Silver
+        const: 'cas.storage.profile.tier:silver'
+      - title: Bronze
+        const: 'cas.storage.profile.tier:bronze'
+      - title: Gold
+        const: 'cas.storage.profile.tier:gold'
+      - title: PCI
+        const: 'cas.storage.profile.cap:pci'
+  webCount:
+    type: integer
+    description: Web Frontend Size (Number of nodes)
+    default: 1
+    title: Frontend Size
+    minimum: 0
+    maximum: 5
+#------------------------RESOURCES-----------------------#
+resources:
+  app-net:
+    type: Cloud.Network
+    properties:
+      name: net-tito-web
+      networkType: existing
+      constraints:
+        - tag: '${input.network}'
+  applb:
+    type: Cloud.LoadBalancer
+    properties:
+      # Do not deploy LB if cloud account is VMC or vSphere. VMC Does not support a LB dpeloyment. 
+      name: lb-tito-web
+      routes:
+        - protocol: HTTP
+          port: '80'
+          instanceProtocol: HTTP
+          instancePort: '80'
+      network: '${resource["app-net"].name}'
+      instances: '${resource["web-tier"][*].id}'
+      internetFacing: true
+  web-tier:
+    type: Cloud.Machine
+    properties:
+      constraints:
+        - tag: '${input.cloudZone}'
+        - tag: '${input.environment}'
+        - tag: '${input.cloudAccountOwner}'
+      name: vm-tito-web
+      flavor: '${input.flavour}'
+      image: '${input.image}'
+      networks:
+        - name: '${resource["app-net"].name}'
+          network: '${resource["app-net"].id}'
+          assignment: '${input.ipAssignment}'
+      storage:
+        disks:
+          - capacityGb: 4
+        constraints:
+          - tag: '${input.storageTier}'
+      remoteAccess:
+        authentication: publicPrivateKey
+        sshKey: www.kaloferov.com
+      cloudConfig: |
+        #cloud-config
+        repo_update: true
+        repo_upgrade: all
+        packages:
+          - git
+        runcmd:
+          - sudo -s
+          - yum install -y epel-release
+          - yum install -y stress
+          - stress --cpu  4 --timeout 4m
+      autoScaleConfiguration:
+        policy: Metric
+        metricScaleRules:
+          - action:
+              type: ChangeCount
+              value: -2
+              cooldown: 60
+            trigger:
+              metric: CPUUtilization
+              period: 60
+              operator: LessThan
+              statistic: Average
+              threshold: 3
+              evaluationPeriods: 1
+          - action:
+              type: ChangeCount
+              value: 2
+              cooldown: 60
+            trigger:
+              metric: CPUUtilization
+              period: 60
+              operator: GreaterThan
+              statistic: Average
+              threshold: 1
+              evaluationPeriods: 3
+        maxSize: 3
+        minSize: 1
+      count: '${input.webCount}'

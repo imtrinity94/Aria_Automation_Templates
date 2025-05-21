@@ -1,0 +1,36 @@
+#--------------------------------------------------------#
+#                     Spas Kaloferov                     #
+#                   www.kaloferov.com                    #
+# bit.ly/The-Twitter      Social     bit.ly/The-LinkedIn #
+# bit.ly/The-Gitlab        Git         bit.ly/The-Github #
+# bit.ly/The-BSD         License          bit.ly/The-GNU #
+#--------------------------------------------------------#
+info: |-
+  #
+  #     VMware Cloud Assembly Blueprint Code Sample     
+  # 
+  # - Create Azure Resource group
+  #
+name: Azure - Create Resource Group
+version: 1
+#-------------------------INPUTS-------------------------#
+inputs:
+  cloudZone:
+    type: string
+    oneOf:
+      - title: Azure
+        const: 'cas.cloud.account.source:azure'
+    default: 'cas.cloud.account.source:azure'
+    description: Select Public CLoud.
+    title: Cloud
+  rg-name:
+    type: string
+    description: Enter RG Name
+    title: RG Name
+#------------------------RESOURCES-----------------------#
+resources:
+  Cloud_Azure_ResourceGroup_1:
+    type: Cloud.Azure.ResourceGroup
+    properties:
+      useExisting: false
+      name: '${input.rg-name}'

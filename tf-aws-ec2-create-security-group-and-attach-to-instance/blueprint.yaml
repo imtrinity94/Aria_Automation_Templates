@@ -1,0 +1,261 @@
+#--------------------------------------------------------#
+#                     Spas Kaloferov                     #
+#                   www.kaloferov.com                    #
+# bit.ly/The-Twitter      Social     bit.ly/The-LinkedIn #
+# bit.ly/The-Gitlab        Git        bit.ly/The-Youtube #
+# bit.ly/The-BSD         License          bit.ly/The-GNU #
+#--------------------------------------------------------#
+info: |-
+  #
+  #     VMware Cloud Assembly Terraform Code Sample     
+  # 
+  # - Creates On-demand AWS Security Group
+  # - Attaches up to 3 Single-NIC Cloud Template Machine Resrouces to it. 
+  # - Supports multiple instances of the same Machine Resource (count property)
+  # - Creates Ingress and Egress Rules
+  # - Provites Terraform Outputs for created obejcts 
+  # - Reference: http://kaloferov.com/blog/
+  # 
+name: TF - AWS EC2 - Create Security Group and Attach to Instance
+version: 1
+#-------------------------INPUTS-------------------------#
+inputs:
+  image:
+    type: string
+    description: <b> Select image and custom spec </b>
+    default: centos-74-livefire-image
+    title: Image & Spec
+    oneOf:
+      - title: 'CentOS 7.4 '
+        const: centos-74-livefire-image
+  flavour:
+    comment: |
+      # Example of an String enum drop-down input. The 
+      # description field provides examples of using basic 
+      # bold <b></b> and break <br> html tags. 
+    type: string
+    enum:
+      - micro
+      - small
+      - medium
+      - large
+    description: |-
+      <b> Select the size of the deployment. </b> <br>
+      Micro = 1 CPU - 1 GB RAM, <br>
+      Small =  1 CPU - 2 GB RAM, <br>
+      Medium = 2 CPU - 4 GB RAM, <br> 
+      Large = 2 CPU - 8 GB RAM <br>
+    default: micro
+    title: Flavour (Size)
+  cloudZone:
+    comment: |
+      # Example of an String oneOf drop-down input. 
+    type: string
+    description: <b> Select Public CLoud. </b> <br>
+    default: 'cas.cloud.zone.type:aws'
+    title: Cloud
+    oneOf:
+      - title: AWS
+        const: 'cas.cloud.zone.type:aws'
+  network:
+    comment: |
+      # Example of an String oneOf drop-down input. 
+    type: string
+    description: <b> Select Network to Attach to </b> <br>
+    default: 'cas.network.type:public'
+    title: Network
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: Public
+        const: 'cas.network.type:public'
+      - title: Private
+        const: 'cas.network.type:private'
+  ipAssignment:
+    comment: |
+      # Example of an String oneOf drop-down input. 
+    type: string
+    description: <b> Select IP Assignment Method </b> <br>
+    default: dynamic
+    title: IP Assignment
+    oneOf:
+      - title: Dynamic
+        const: dynamic
+      - title: Static
+        const: static
+  webCount:
+    type: integer
+    description: <b> Web Frontend Size (Number of nodes)  </b> <br>
+    default: 1
+    title: Frontend Size
+    minimum: 1
+    maximum: 3
+  awsSgIngressRules:
+    type: array
+    title: SG Ingress Rules
+    items:
+      type: object
+      properties:
+        from_port:
+          type: string
+          title: fromPort *
+          minLength: 1
+          maxLength: 5
+          pattern: '^((6553[0-5])|(655[0-2][0-9])|(65[0-4][0-9]{2})|(6[0-4][0-9]{3})|([1-5][0-9]{4})|([0-5]{0,5})|([0-9]{1,4}))$'
+          description: (Required) The start port (or ICMP type number if protocol is "icmp" or "icmpv6").
+        to_port:
+          type: string
+          title: toPort *
+          minLength: 1
+          maxLength: 5
+          pattern: '^((6553[0-5])|(655[0-2][0-9])|(65[0-4][0-9]{2})|(6[0-4][0-9]{3})|([1-5][0-9]{4})|([0-5]{0,5})|([0-9]{1,4}))$'
+          description: (Required) The end port (or ICMP code if protocol is "icmp").
+        protocol:
+          type: string
+          title: protocol *
+          enum:
+            - TCP
+            - UDP
+            - Echo Replay
+            - IPv6 ICMP
+            - ICMP
+            - All
+          description: '(Required) The protocol. If not icmp, icmpv6, tcp, udp, or all use the protocol number'
+        cidr_blocks:
+          type: string
+          title: cidr_blocks *
+          pattern: '^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/\d+$'
+          minLength: 9
+          maxLength: 19
+          description: (Optional) List of CIDR blocks. Cannot be specified with source_security_group_id.
+        #ipv6_cidr_blocks:
+        #  type: string
+        #  title: ipv6_cidr_blocks
+        #  description: (Optional) List of IPv6 CIDR blocks.
+        description:
+          type: string
+          title: description *
+          minLength: 1
+          description: (Optional) Description of the rule.
+  awsSgEgressRules:
+    type: array
+    title: SG Egress Rules
+    items:
+      type: object
+      properties:
+        from_port:
+          type: string
+          title: fromPort *
+          minLength: 1
+          maxLength: 5
+          pattern: '^((6553[0-5])|(655[0-2][0-9])|(65[0-4][0-9]{2})|(6[0-4][0-9]{3})|([1-5][0-9]{4})|([0-5]{0,5})|([0-9]{1,4}))$'
+          description: (Required) The start port (or ICMP type number if protocol is "icmp" or "icmpv6").
+        to_port:
+          type: string
+          title: toPort *
+          minLength: 1
+          maxLength: 5
+          pattern: '^((6553[0-5])|(655[0-2][0-9])|(65[0-4][0-9]{2})|(6[0-4][0-9]{3})|([1-5][0-9]{4})|([0-5]{0,5})|([0-9]{1,4}))$'
+          description: (Required) The end port (or ICMP code if protocol is "icmp").
+        protocol:
+          type: string
+          title: protocol *
+          enum:
+            - TCP
+            - UDP
+            - Echo Replay
+            - IPv6 ICMP
+            - ICMP
+            - All
+          description: '(Required) The protocol. If not icmp, icmpv6, tcp, udp, or all use the protocol number'
+        cidr_blocks:
+          type: string
+          title: cidr_blocks *
+          pattern: '^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/\d+$'
+          minLength: 9
+          maxLength: 19
+          description: (Optional) List of CIDR blocks. Cannot be specified with source_security_group_id.
+        #ipv6_cidr_blocks:
+        #  type: string
+        #  title: ipv6_cidr_blocks
+        #  description: (Optional) List of IPv6 CIDR blocks.
+        description:
+          type: string
+          title: description
+          description: (Optional) Description of the rule.
+#------------------------RESOURCES-----------------------#
+resources:
+  app-net:
+    type: Cloud.Network
+    properties:
+      name: net-tito-web
+      networkType: existing
+      constraints:
+        - tag: '${input.network}'
+  web-tier:
+    type: Cloud.Machine
+    dependsOn:
+      - db-tier
+    properties:
+      name: vm-tito-web
+      flavor: '${input.flavour}'
+      image: '${input.image}'
+      constraints:
+        - tag: '${input.cloudZone}'
+      networks:
+        - name: '${resource["app-net"].name}'
+          network: '${resource["app-net"].id}'
+          assignment: '${input.ipAssignment}'
+      storage:
+        disks:
+          - capacityGb: 4
+      count: 2
+  db-tier:
+    type: Cloud.Machine
+    properties:
+      name: vm-tito-db
+      flavor: '${input.flavour}'
+      image: '${input.image}'
+      constraints:
+        - tag: '${input.cloudZone}'
+      storage:
+        disks:
+          - capacityGb: 4
+      networks:
+        - network: '${resource["app-net"].id}'
+          assignment: '${input.ipAssignment}'
+  create-aws-sg:
+    type: Cloud.Terraform.Configuration
+    dependsOn:
+      - db-tier
+      - web-tier
+    comment: |
+      # Example of a Terraform configuraiton that creates an 
+      # AWS Security Group and attaches it to the instnace(s)
+      # TF files can be found in the Gitlab link provided
+    properties:
+      variables:
+        # awsSgName: Supplies a name for the SG. Format is: userName-deploymentId
+        awsSgName: '${(split(env.requestedBy,"@")[0])+"-"+env.deploymentId}'
+        # awsSgTagOwner: Adds the deployment requestor as Tag value to the SG      
+        awsSgTagOwner: '${(split(env.requestedBy,"@")[0])}'
+        # awsProviderRegion: Gets the Provider Region of the machine resources
+        awsProviderRegion: '${resource["db-tier"].region}'
+        # awsProviderRegion: Gets the VPC ID of the machine resources
+        awsVpcId: '${resource["db-tier"].awsVpcId}'
+        # awsInstanceId1/2/3: Uncomment variables properties awsInstanceId1/2/3 to attach more instances if needed. 
+        awsInstanceId1: '${to_string(resource["db-tier"].providerId)}'
+        awsInstanceId2: '${to_string(resource["web-tier"].providerId)}'
+        #awsInstanceId3: ''
+        # awsSgIngressRules: Adds the Ingress Rules from Inputs
+        awsSgIngressRules: '${to_string(input.awsSgIngressRules)}'
+        # awsSgEgressRules: Adds the Egress Rules from Inputs
+        awsSgEgressRules: '${to_string(input.awsSgEgressRules)}'
+      providers:
+        - name: aws
+          cloudZone: '${resource["db-tier"].account+"/"+resource["db-tier"].region}'
+      terraformVersion: 0.12.29
+      configurationSource:
+        repositoryId: ">>> YOUR REPO ID <<<"
+        commitId: ">>> TODO YOUR COMMIT ID <<<"
+        sourceDirectory: aws-ec2-create-security-group-and-attach-to-instance

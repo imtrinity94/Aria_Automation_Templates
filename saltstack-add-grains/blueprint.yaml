@@ -1,0 +1,177 @@
+#--------------------------------------------------------#
+#                     Spas Kaloferov                     #
+#                   www.kaloferov.com                    #
+# bit.ly/The-Twitter      Social     bit.ly/The-LinkedIn #
+# bit.ly/The-Gitlab        Git        bit.ly/The-Youtube #
+# bit.ly/The-BSD         License          bit.ly/The-GNU #
+#--------------------------------------------------------#
+info: |-
+  #
+  #     VMware Cloud Assembly Blueprint Code Sample     
+  # 
+  # - Installs SaltStack agent. Installer script supports
+  #   all bootstrap installer params: 
+  #   https://github.com/saltstack/salt-bootstrap#bootstrapping-salt
+  # - Adds Deployment info and user-input as Salt Grains.
+  #   - These are examples on how to add grians that come 
+  #     from different types: list, input array, tag array...
+  #   - This should cover the majority of usecases to supply 
+  #     the data. The once that are not needed can be removed 
+  #     (or added) with the appropriate command switch:
+  #     - c: Adds Constraints as Salt Grains 
+  #     - t: Adds Tags as Salt Grains 
+  #     - a: Adds (input) Array as Salt Grains 
+  #     - l: Adds list as Salt Grains 
+  #
+name: SaltStack - Add Grains
+version: 1
+#-------------------------INPUTS-------------------------#
+inputs:
+  image:
+    type: string
+    description: <b> Select image and custom spec </b>
+    default: 'centos-74-livefire-image,CentOS7'
+    title: Image & Spec
+    oneOf:
+      - title: 'CentOS 7.4 (Livefire v0.2, CentOS7 Spec)'
+        const: 'centos-74-livefire-image,CentOS7'
+  flavour:
+    type: string
+    enum:
+      - micro
+    default: micro
+    title: Flavour (Size)
+  environment:
+    type: string
+    description: '<b> Select the development, testing, or production environment . </b> <br>'
+    default: 'cas.cloud.zone.env:dev'
+    title: Environment
+    oneOf:
+      - title: Development
+        const: 'cas.cloud.zone.env:dev'
+  cloudZone:
+    type: string
+    description: <b> Select Public CLoud. </b> <br>
+    default: 'cas.cloud.zone.type:aws'
+    title: Cloud
+    oneOf:
+      - title: AWS
+        const: 'cas.cloud.zone.type:aws'
+  network:
+    type: string
+    description: <b> Select Network to Attach to </b> <br>
+    default: 'cas.network.type:public'
+    title: Network
+    oneOf:
+      - title: Public
+        const: 'cas.network.type:public'
+  ipAssignment:
+    type: string
+    description: <b> Select IP Assignment Method </b> <br>
+    default: dynamic
+    title: IP Assignment
+    oneOf:
+      - title: Dynamic
+        const: dynamic
+  storageTier:
+    type: string
+    description: <b> Select Storage Tier </b> <br>
+    default: 'cas.storage.profile.tier:silver'
+    title: Storage Tier
+    oneOf:
+      - title: Silver
+        const: 'cas.storage.profile.tier:silver'
+  line3:
+    type: string
+    title: ''
+    readOnly: true
+    default: '- - - - - - - - - - - - - - - - - - - - - - S A L T - - - - - - - - - - - - - - - - - - - - - - -'
+  sseMinionInstall:
+    comment: |
+      Used by cloudConfig to install  SaltStack Config (SSC) 
+      Minion Agent.
+    type: string
+    description: <b>Select to install SSC Minion Agent.</b>
+    default: 'No'
+    title: Salt Minion Install
+    enum:
+      - 'Yes'
+      - 'No'
+  sseMinionGrains:
+    comment: |
+      Used by cloudConfig to add Custom Salt Minion Grains
+      from an User Input.
+    encrypted: true
+    type: array
+    description: |-
+      <b> Enter Custom Minion Grains </b> <br>
+      Allowed characters:  <br>
+      Only hyphens (-), underscores (_), lowercase characters, and numbers are allowed. <br>
+    title: Salt Minion Grains
+    items:
+      type: object
+      properties:
+        key:
+          type: string
+          title: Name
+          description: 'Only hyphens (-), underscores (_), lowercase characters, and numbers are allowed.'
+          pattern: '^[-a-z0-9\-\_]*$'
+        value:
+          type: string
+          title: Value
+          description: 'Only hyphens (-), underscores (_), lowercase characters, and numbers are allowed.'
+          pattern: '^[-a-z0-9\-\_]*$'
+#------------------------RESOURCES-----------------------#
+resources:
+  app-net:
+    type: Cloud.Network
+    properties:
+      name: app-net
+      networkType: existing
+  sse-vm:
+    type: Cloud.Machine
+    properties:
+      tags:
+        - key: tag-key
+          value: tag-value
+      flavor: '${input.flavour}'
+      # image: Exmaple of how to parse multivalue input and get a given value 
+      image: '${split(input.image,",")[0]}'
+      constraints:
+        - tag: '${input.cloudZone}'
+        - tag: '${input.environment}'
+      storage:
+        disks:
+          - capacityGb: 4
+        constraints:
+          - tag: '${input.storageTier}'
+      networks:
+        - network: '${resource["app-net"].id}'
+          assignment: '${input.ipAssignment}'
+      cloudConfig: |
+        #cloud-config 
+        repo_update: true
+        repo_upgrade: all
+        packages:
+          - git
+        runcmd:
+          - sudo -s
+            #----------------- Instal SaltStack Minion ----------------#
+          - if [ ${input.sseMinionInstall} == "Yes" ]; 
+          - then 
+          -    cd /tmp
+          -    #------------------- Install Minion --------------------#
+          -    curl -L 'https://gitlab.com/skaloferov/saltstack/-/raw/master/setup-scripts/salt-minion-setup-vmw-assembly-centos-bs-gr.sh' -o salt-minion-setup-vmw-assembly-centos-bs-gr.sh ; 
+          -    chmod u+x *.sh
+          -    bash salt-minion-setup-vmw-assembly-centos-bs-gr.sh -A <SALTSTACK_SERVER_FQDN>
+          -    #------------------ Add Custom Grains ------------------#
+          -    cd /tmp 
+          -    grainsList="requested_by:${env.requestedBy},project_name:${env.projectName},region:${self.region},image:${self.image},flavor:${self.flavor},account:${self.account}"
+          -    grainsCons="${self.constraints}"
+          -    grainsTags="${self.tags}"
+          -    grainsArray="${input.sseMinionGrains}"
+          -    curl -L 'https://gitlab.com/skaloferov/saltstack/-/raw/master/salt-minion/grains/salt-minion-vmw-assembly-ct-add-grains.sh' -o salt-minion-vmw-assembly-ct-add-grains.sh ; 
+          -    chmod u+x *.sh
+          -    bash salt-minion-vmw-assembly-ct-add-grains.sh -c $grainsCons -t $grainsTags -a $grainsArray -l $grainsList
+          - fi
+            #----------------------------------------------------------#

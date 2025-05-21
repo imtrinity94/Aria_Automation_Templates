@@ -1,0 +1,54 @@
+#--------------------------------------------------------#
+#                     Spas Kaloferov                     #
+#                   www.kaloferov.com                    #
+# bit.ly/The-Twitter      Social     bit.ly/The-LinkedIn #
+# bit.ly/The-Gitlab        Git         bit.ly/The-Github #
+# bit.ly/The-BSD         License          bit.ly/The-GNU #
+#--------------------------------------------------------#
+info: |-
+  #
+  # VMware Cloud Assembly Blueprint Sample
+  # - Creates a Route53 Alias Record 
+  # 
+name: AWS - Route53 Create Alias Record
+version: 1
+#-------------------------INPUTS-------------------------#
+inputs:
+  region:
+    type: string
+    title: Region
+    default: us-west-2
+    readOnly: true
+    description: Enter Route53 Region
+  route53_zone_id:
+    type: string
+    title: Route53 Zone ID
+    default: ENTER ROUTE ZONE ID
+    readOnly: true
+    description: Enter Route53 Zone ID
+  dns_name:
+    type: string
+    title: DNS Name
+    readOnly: true
+    default: tito.elasticskyholdings.com
+    pattern: '[a-z]'
+    description: Enter (FQDN) DNS Name
+  elb_dns_name:
+    type: string
+    title: ELB DNS Name
+    description: Enter Route53 ELB DNS Name
+#------------------------RESOURCES-----------------------#
+resources:
+  aws-route53-a:
+    type: Cloud.Service.AWS.Route53.Record
+    preventDelete: true
+    properties:
+      name: ${input.dns_name}
+      type: A
+      alias:
+        - name: ${input.elb_dns_name}
+          evaluate_target_health: false
+          zone_id: ENTER ALIAS ZONE ID
+      region: ${input.region}
+      zone_id: ${input.route53_zone_id}
+      account: AWS Cloud

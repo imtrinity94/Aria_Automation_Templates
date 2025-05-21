@@ -1,0 +1,106 @@
+#--------------------------------------------------------#
+#                     Spas Kaloferov                     #
+#                   www.kaloferov.com                    #
+# bit.ly/The-Twitter      Social     bit.ly/The-LinkedIn #
+# bit.ly/The-Gitlab        Git         bit.ly/The-Github #
+# bit.ly/The-BSD         License          bit.ly/The-GNU #
+#--------------------------------------------------------#
+info: |-
+  #
+  #     VMware Cloud Assembly Blueprint Code Sample     
+  #
+  # - Creates an S3 bucket and create a file object in it. 
+  # - Creates a policy and adds the current user/requestor with full permissions.
+  #
+name: AWS - S3 Create Bucket , Object and Policy
+version: 1
+#-------------------------INPUTS-------------------------#
+inputs:
+  cloudZone:
+    type: string
+    description: enter AWS Cloud Account Name
+    default: AWS Cloud
+    title: AWS Cloud Account Name
+  s3-bucket-region:
+    minLength: 9
+    type: string
+    description: 'Target cloud region, such as us-east-1. Must be within the provider cloud account.'
+    default: us-west-2
+    title: S3 Bucket Region
+  s3-bucket-prefix:
+    type: string
+    description: User-defined text to add to automatic bucket name. Cannot be used simultaneously with bucket. Forces new resources.
+    default: my-bucket-
+    title: S3 Bucket Prefix
+    pattern: '^[-a-z0-9\-]*$' # only lowercase alphanumeric characters and hyphens allowed
+  create-object:
+    type: boolean
+    description: Wherever to create object?
+    default: true
+    title: Create Object?
+  s3-bucket-filename:
+    minLength: 1
+    type: string
+    description: Name of the file once it is in the S3 bucket.
+    default: www.Kaloferov.com.txt
+    title: Filename
+  s3-bucket-file-content-base64:
+    minLength: 1
+    type: string
+    description: Base64-encoded data that will be decoded and uploaded as raw bytes for the object content.
+    default: U3BhcyBJcyBBd2Vzb21lISEhIAp3d3cua2Fsb2Zlcm92LmNvbQ==
+    title: File Content
+  create-policy:
+    type: boolean
+    description: Wherever to create policy?
+    default: true
+    title: Create Policy?
+  aws-principal-arn:
+    type: string
+    title: AWS Principal ARN
+    description: AWS Principal ARN or leave empty to auto-add requestor user
+    default: ''
+#------------------------RESOURCES-----------------------#
+resources:
+  s3-bucket-object:
+    type: Cloud.Service.AWS.S3.Bucket.Object
+    dependsOn:
+      - s3-bucket
+    properties:
+      count: '${input.create-object == true ? 1 : 0 }'
+      content_base64: '${input.s3-bucket-file-content-base64}' # e.g. U3BhcyBJcyBBd2Vzb21lISEhIAp3d3cua2Fsb2Zlcm92LmNvbQ==
+      key: '${input.s3-bucket-filename}' # e.g. www.kaloferov.com.txt
+      bucket: '${resource["s3-bucket"].bucket}' # e.g. my-bucket-{UUID}
+      region: '${input.s3-bucket-region}' # e.g. us-west-2
+      account: '${input.cloudZone}' # e.g. AWS Cloud
+  s3-bucket:
+    type: Cloud.Service.AWS.S3.Bucket
+    properties:
+      bucket_prefix: '${input.s3-bucket-prefix}' # e.g. my-bucket
+      region: '${input.s3-bucket-region}' # e.g. us-west-2
+      account: '${input.cloudZone}' # e.g. AWS Cloud
+  s3-bucket-policy:
+    type: Cloud.Service.AWS.S3.Bucket.Policy
+    dependsOn:
+      - s3-bucket
+    properties:
+      count: '${input.create-policy == true ? 1 : 0 }'
+      bucket: '${resource["s3-bucket"].bucket}'
+      policy: |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Effect": "Allow",
+              "Resource": "${resource["s3-bucket"].arn}",
+              "Principal": {
+                "AWS": [
+                  "${input.aws-principal-arn == '' ? 'arn:aws:iam::<TODO_ENTER_ACCOUNT_ID>:user/'+trim(replace(env.requestedBy,'@<TODO_ENTER_DOMAIN_NAME>',' ')) : trim(input.aws-principal-arn) }"
+                ]
+              }
+            }
+          ]
+        }
+      region: us-west-2 # e.g. us-west-2
+      account: AWS Cloud # e.g. AWS Cloud

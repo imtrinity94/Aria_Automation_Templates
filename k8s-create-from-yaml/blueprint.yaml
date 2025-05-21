@@ -1,0 +1,226 @@
+#--------------------------------------------------------#
+#                     Spas Kaloferov                     #
+#                   www.kaloferov.com                    #
+# bit.ly/The-Twitter      Social     bit.ly/The-LinkedIn #
+# bit.ly/The-Gitlab        Git         bit.ly/The-Github #
+# bit.ly/The-BSD         License          bit.ly/The-GNU #
+#--------------------------------------------------------#
+info: |-
+  #
+  #     VMware Cloud Assembly Blueprint Code Sample     
+  #
+  # - Creates a K8s Namespace. 
+  # - Optionally also creates a deployment based on Yaml file. 
+  # - Do not change or rename any of the inputs. 
+  # - This uses the k8sCreateFromYaml-py Assembly ABX Action 
+  #   in this repo. 
+  # 
+name: K8S - Create From YAML
+version: 1
+#-------------------------INPUTS-------------------------#
+inputs:
+  cluster:
+    type: string
+    title: Cluster
+    description: |
+      Select a K8s Cluster for the deployment. 
+    default: 'cas.kubs.zone.type:tmc'
+    oneOf:
+      - title: TMC
+        const: 'cas.kubs.zone.type:tmc'
+      - title: GCP
+        const: 'cas.kubs.zone.type:gcp'
+      - title: Azure
+        const: 'cas.kubs.zone.type:azure'
+  namespace:
+    type: string
+    title: Namespace
+    pattern: '^[-a-z0-9\-]*$'
+    description: |
+      Enter a K8s namespace. All kubernetes YAML documents will
+      be created in this namespace. <br>
+      Container names and port names must conform to the RFC 1123 
+      definition of a DNS label. Names must be no longer than 63 
+      characters, must start and end with a lowercase letter or 
+      number, and may contain lowercase letters, numbers, and hyphens.
+    default: tito
+  actionOptionKubeconfig:
+    comment: |
+      This overrides the actionOptionKubeconfigIn action input 
+      configured in the ABX action. If you want to use the context
+      configured in the action select abs as input. 
+    type: string
+    title: Exec Context
+    #format: hidden
+    description: |
+      Select KubeConfig to use for the run context. You can 
+      choose between the kubeconfig limited to the namespace 
+      being created or use an admin kubeconfig. Selecting 'abx'
+      will use the context configured in the abx action
+    default: namespace
+    enum:
+      - namespace
+      - admin
+      - abx
+  yaml:
+    comment: |
+      This overrides the actionOptionKubeconfigIn actin input 
+      configured in the ABX action. <br>
+      NOTE: use ABX-Parameter-K8sNamespace anywhere in the yaml
+      where you want to use the name of the namespace which is
+      provided by the inputs at request time. 
+    title: Yaml
+    type: string
+    format: hidden
+    description: |
+      Select KubeConfig to use for the run context. You can 
+      choose between the kubeconfig limited to the namespace 
+      being created or use an admin kubeconfig.
+    default: |
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: mysql-pass
+        namespace: ABX-Parameter-K8sNamespace
+        labels:
+          app: tito
+      type: Opaque
+      data:
+        password: VGl0bzIwMTY=
+        # Password created like this: echo -n 'Tito2016' | base64
+      ---
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: titosql
+        generateName: titosql-
+        namespace: ABX-Parameter-K8sNamespace
+        labels:
+          name: tito-sql
+          version: "1.5"
+          app: tito
+          stage: prod
+          tier: backend
+      spec:
+        replicas: 1
+        minReadySeconds: 5
+        strategy: 
+          type: Recreate
+        selector:
+          matchLabels:
+            tier: backend
+            app: tito
+        template:
+          metadata:
+            labels:
+              tier: backend
+              app: tito
+          spec:
+            containers:
+            - name: tito-sql
+              image: harborb.livefire.dev/elasticsky-tito-project/livefire-tito-sql:latest
+              imagePullPolicy: IfNotPresent
+              ports:
+              - containerPort: 3306
+              env:
+              - name: MYSQL_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: mysql-pass
+                    key: password
+      ---
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: tito-sql-service
+        namespace: ABX-Parameter-K8sNamespace
+        labels:
+          app: tito
+          tier: backend
+          stage: prod
+      spec:
+        ports:
+            - port: 3306               # port expose par docker  (pas le port dans le container)
+        selector:                     # key/value, label permettant de definir le pod cible (doit etre danslabels du pod)
+          tier: backend
+      ---
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: titofe
+        namespace: ABX-Parameter-K8sNamespace
+        labels:
+          name: tito-fe
+          version: "latest"
+          app: tito
+          tier: frontend
+          stage: prod
+      spec:
+        replicas: 2
+        selector:
+          matchLabels:
+            type: tito-fe
+            version: v1
+        strategy:
+          type: Recreate
+        template:
+          metadata:
+            labels:
+              app: tito
+              type: tito-fe
+              version: v1
+              tier: frontend
+          spec:
+            containers:
+              - name: tito
+                image: harborb.livefire.dev/elasticsky-tito-project/livefire-tito-fe-ci:48
+                imagePullPolicy: IfNotPresent
+                ports:
+                - containerPort: 80
+                env:
+                - name: TITO_VERSION
+                  value: V2
+                - name: TITO_SQL_SERVICE_HOST
+                  value: tito-sql
+                - name: PROXY_NAME
+                  value: wavefront-proxy.default.svc.cluster.local
+                - name: PROXY_PORT
+                  value: "2878"
+                - name: POD_NAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+      ---
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: titofe-service
+        namespace: ABX-Parameter-K8sNamespace
+        labels:
+          app: tito
+          tier: frontend
+          stage: prod
+      spec:
+        ports:
+        - name: http
+          port: 80               # port expose par docker  (pas le port dans le container)
+        selector:                # key/value, label permettant de definir le pod cible (doit etre danslabels du pod)
+          type: tito-fe
+          tier: frontend
+        type: LoadBalancer
+#------------------------RESOURCES-----------------------#
+resources:
+  k8sNamespace:
+    type: Cloud.K8S.Namespace
+    metadata:
+      layoutPosition:
+        - 0
+        - 0
+    properties:
+      name: '${input.namespace}'
+      constraints:
+        - tag: '${input.cluster}'

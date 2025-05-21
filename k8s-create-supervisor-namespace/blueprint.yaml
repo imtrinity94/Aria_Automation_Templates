@@ -1,0 +1,45 @@
+#--------------------------------------------------------#
+#                     Spas Kaloferov                     #
+#                   www.kaloferov.com                    #
+# bit.ly/The-Twitter      Social     bit.ly/The-LinkedIn #
+# bit.ly/The-Gitlab        Git         bit.ly/The-Github #
+# bit.ly/The-BSD         License          bit.ly/The-GNU #
+#--------------------------------------------------------#
+info: |-
+  #
+  #     VMware Cloud Assembly Blueprint Code Sample     
+  # 
+  # - Creates a TKGs Supervisor Namespace. 
+  #
+name: K8S - Create Supervisor Namespace
+version: 1
+#-------------------------INPUTS-------------------------#
+inputs:
+  cluster:
+    type: string
+    title: Cluster
+    description: |
+      Select a K8s Cluster for the deployment. 
+    default: 'cas.cloud.account.id:haas_wld'
+    oneOf:
+      - title: TKGs (HaaS)
+        const: 'cas.cloud.account.id:haas_wld'
+  namespace:
+    type: string
+    title: Namespace
+    pattern: '^[-a-z0-9\-]*$'
+    description: |
+      Enter a K8s namespace. All kubernetes YAML documents will
+      be created in this namespace. <br>
+      Container names and port names must conform to the RFC 1123 
+      definition of a DNS label. Names must be no longer than 63 
+      characters, must start and end with a lowercase letter or 
+      number, and may contain lowercase letters, numbers, and hyphens.
+#-----------------------RESOURCES------------------------#
+resources:
+  Cloud_SV_Namespace_1:
+    type: Cloud.SV.Namespace
+    properties:
+      name: '${input.namespace}'
+      constraints:
+        - tag: '${input.cluster}'

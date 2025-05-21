@@ -1,0 +1,66 @@
+#--------------------------------------------------------#
+#                     Spas Kaloferov                     #
+#                   www.kaloferov.com                    #
+# bit.ly/The-Twitter      Social     bit.ly/The-LinkedIn #
+# bit.ly/The-Gitlab        Git        bit.ly/The-Youtube #
+# bit.ly/The-BSD         License          bit.ly/The-GNU #
+#--------------------------------------------------------#
+info: |-
+  #
+  #     VMware Cloud Assembly Blueprint Code Sample     
+  #
+  #  - Creates an Azure Storage Account
+  #
+name: Azure - Create Storage Account
+version: 1
+#-------------------------INPUTS-------------------------#
+inputs:
+  name:
+    type: string
+    description: <b> Storage Account Name </b>
+    default: spasisawesome
+    title: Name
+  region:
+    type: string
+    description: <b> Storage Account Region </b>
+    default: westus2
+    title: Region
+  account:
+    type: string
+    description: <b> Assembly Cloud Account  </b>
+    default: Azure Cloud
+    title: Cloud Account
+  accountTier:
+    type: string
+    description: <b> Account Tier </b>
+    default: Standard
+    title: Account Tier
+    enum:
+      - Standard
+      - Premium
+  rgName:
+    type: string
+    description: <b> Resource Group Name </b>
+    default: elasticsky-test-rg
+    title: RG Name
+  accountReplicationType:
+    type: string
+    description: <b> Storage Account Name </b>
+    default: LRS
+    title: Replication Type
+    enum:
+      - LRS
+      - GRS
+      - RAGRS
+      - ZRS
+#------------------------RESOURCES-----------------------#
+resources:
+  storageAccount:
+    type: Cloud.Service.Azure.Storage.Account
+    properties:
+      name: '${input.name}'
+      region: '${input.region}'
+      account: '${input.account}'
+      account_tier: '${input.accountTier}'
+      resource_group_name: '${input.rgName}'
+      account_replication_type: '${input.accountReplicationType}'

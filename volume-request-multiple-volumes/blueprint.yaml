@@ -1,0 +1,613 @@
+#--------------------------------------------------------#
+#                     Spas Kaloferov                     #
+#                   www.kaloferov.com                    #
+# bit.ly/The-Twitter      Social     bit.ly/The-LinkedIn #
+# bit.ly/The-Gitlab        Git         bit.ly/The-Github #
+# bit.ly/The-BSD         License          bit.ly/The-GNU #
+#--------------------------------------------------------#
+info: |
+  #
+  #       VMware Cloud Assembly Blueprint Code Sample          
+  # 
+  # [Info]
+  #  - Offers a choice to deploy 2 types/sizes of volumes.
+  #  - Can deploy up to 20 volumes of each type/size.
+  #  - Allows volume size to be selected individually.
+  #  - Includes a Custom Form template.
+  #
+name: Volume - Request Multiple Volumes
+version: 1
+#----------------------CUSTOM FORMS----------------------#
+customForm: |
+  # the following is a YAML exported from the custom form. 
+  # Import this custom form in Service Broker for the BP.  
+  layout:
+    pages:
+      - id: page_general
+        sections:
+          - id: section_deploymentName
+            fields:
+              - id: deploymentName
+                display: textField
+                state:
+                  visible: true
+                  read-only: false
+          - id: section_description
+            fields:
+              - id: description
+                display: textArea
+                state:
+                  visible: true
+                  read-only: false
+          - id: section_project
+            fields:
+              - id: project
+                display: dropDown
+                state:
+                  visible: true
+                  read-only: false
+          - id: section_image
+            fields:
+              - id: image
+                display: dropDown
+                state:
+                  visible: true
+                  read-only: false
+          - id: section_flavour
+            fields:
+              - id: flavour
+                display: dropDown
+                state:
+                  visible: true
+                  read-only: false
+          - id: section_81502e14
+            fields:
+              - id: environment
+                display: dropDown
+                state:
+                  visible: true
+                  read-only: false
+          - id: section_c12c34ef
+            fields:
+              - id: cloudZone
+                display: dropDown
+                state:
+                  visible: true
+                  read-only: false
+          - id: section_2d6f130d
+            fields:
+              - id: cloudAccountOwner
+                display: dropDown
+                state:
+                  visible: true
+                  read-only: false
+          - id: section_network
+            fields:
+              - id: network
+                display: dropDown
+                state:
+                  visible: true
+                  read-only: false
+          - id: section_0f66f352
+            fields:
+              - id: storageTier
+                display: dropDown
+                state:
+                  visible: true
+                  read-only: false
+          - id: section_8ffd7636
+            fields:
+              - id: resourceGroup
+                display: dropDown
+                state:
+                  visible: true
+                  read-only: false
+          - id: section_breakLine01
+            fields:
+              - id: breakLine01
+                display: textField
+                state:
+                  visible: true
+                  read-only: true
+                submit: false
+          - id: section_7af740d0
+            fields:
+              - id: volume1count
+                display: integerField
+                state:
+                  visible: true
+                  read-only: false
+          - id: section_volume1size
+            fields:
+              - id: volume1size
+                display: integerField
+                state:
+                  read-only: false
+                  visible:
+                    - '>':
+                        volume1count: 0
+                      value: true
+          - id: section_52d7332e
+            fields:
+              - id: volume1storage
+                display: dropDown
+                state:
+                  read-only: false
+                  visible:
+                    - '>':
+                        volume1count: 0
+                      value: true
+          - id: section_dd028394
+            fields:
+              - id: volume2count
+                display: integerField
+                state:
+                  visible: true
+                  read-only: false
+          - id: section_volume2size
+            fields:
+              - id: volume2size
+                display: integerField
+                state:
+                  read-only: false
+                  visible:
+                    - '>':
+                        volume2count: 0
+                      value: true
+          - id: section_volume2storage
+            fields:
+              - id: volume2storage
+                display: dropDown
+                state:
+                  read-only: false
+                  visible:
+                    - '>':
+                        volume2count: 0
+                      value: true
+        title: General
+        state: {}
+  schema:
+    deploymentName:
+      label: Deployment Name
+      description: Deployment Name
+      type:
+        dataType: string
+        isMultiple: false
+      constraints:
+        required: true
+        max-value: 80
+    description:
+      label: Description
+      description: Description
+      type:
+        dataType: string
+        isMultiple: false
+      constraints:
+        max-value: 256
+    project:
+      label: Project
+      description: Project
+      type:
+        dataType: string
+        isMultiple: false
+      valueList:
+        id: projects
+        type: scriptAction
+      constraints:
+        required: true
+    image:
+      label: Image
+      description: Select image
+      signpost: Select image
+      type:
+        dataType: string
+        isMultiple: false
+      default: centos-74-livefire-image
+      valueList:
+        - value: centos-74-image
+          label: CentOS 7.4
+        - value: centos-74-livefire-image
+          label: CentOS 7.4 (Livefire)
+    flavour:
+      label: Flavour (Size)
+      description: Select the size of the deployment.
+      signpost: Select the size of the deployment.
+      type:
+        dataType: string
+        isMultiple: false
+      default: micro
+      valueList:
+        - value: micro
+          label: micro
+        - value: small
+          label: small
+    environment:
+      label: Environment
+      description: 'Select the development, testing, or production environment .'
+      signpost: 'Select the development, testing, or production environment .'
+      type:
+        dataType: string
+        isMultiple: false
+      default: 'cas.cloud.zone.env:dev'
+      valueList:
+        - value: ''
+          label: '* ANY *'
+        - value: 'cas.cloud.zone.env:dev'
+          label: Development
+        - value: 'cas.cloud.zone.env:test'
+          label: Test
+        - value: 'cas.cloud.zone.env:prod'
+          label: Prodiction
+    cloudZone:
+      label: Cloud
+      description: Select Public CLoud.
+      signpost: Select Public CLoud.
+      type:
+        dataType: string
+        isMultiple: false
+      default: 'cas.cloud.zone.source:aws'
+      valueList:
+        - value: ''
+          label: '* ANY *'
+        - value: 'cas.cloud.zone.source:aws'
+          label: AWS
+        - value: 'cas.cloud.zone.source:azure'
+          label: Azure
+        - value: 'cas.cloud.zone.source:gcp'
+          label: GCP
+        - value: 'cas.cloud.zone.source:vmc'
+          label: VMC
+    cloudAccountOwner:
+      label: Owner
+      description: Select Public CLoud Owner.
+      signpost: Select Public CLoud Owner.
+      type:
+        dataType: string
+        isMultiple: false
+      default: 'cas.cloud.account.owner:elastic_sky'
+      valueList:
+        - value: ''
+          label: '* ANY *'
+        - value: 'cas.cloud.account.owner:elastic_sky'
+          label: ElasticSky
+    network:
+      label: Network
+      description: Select Network to Attach to
+      signpost: Select Network to Attach to
+      type:
+        dataType: string
+        isMultiple: false
+      default: 'cas.network.type:public'
+      valueList:
+        - value: ''
+          label: '* ANY *'
+        - value: 'cas.network.type:public'
+          label: Public
+        - value: 'cas.network.type:private'
+          label: Private
+    storageTier:
+      label: Storage Tier
+      description: Select Storage Tier
+      signpost: Select Storage Tier
+      type:
+        dataType: string
+        isMultiple: false
+      default: 'cas.storage.profile.tier:silver'
+      valueList:
+        - value: ''
+          label: '* ANY *'
+        - value: 'cas.storage.profile.tier:silver'
+          label: Silver
+        - value: 'cas.storage.profile.tier:bronze'
+          label: Bronze
+        - value: 'cas.storage.profile.tier:gold'
+          label: Gold
+        - value: 'cas.storage.profile.cap:pci'
+          label: PCI
+    resourceGroup:
+      label: Resource Group
+      description: Select Resource Group
+      signpost: Select Resource Group
+      type:
+        dataType: string
+        isMultiple: false
+      default: Static
+      valueList:
+        - value: Static
+          label: Static
+        - value: ''
+          label: Dynamic
+        - value: Workloads
+          label: VMC (Workloads)
+    breakLine01:
+      label: '------------------------------------------------------'
+      type:
+        dataType: string
+        isMultiple: false
+      default: '----------------------------------------------------------------------'
+    volume1count:
+      label: '1: Volume Count?'
+      description: Add additional volume
+      signpost: Add additional volume
+      type:
+        dataType: integer
+        isMultiple: false
+      default: 0
+      constraints:
+        min-value: 0
+        max-value: 20
+    volume1size:
+      label: '1: Volume Size'
+      type:
+        dataType: integer
+        isMultiple: false
+      default: 50
+    volume1storage:
+      label: '1: Storage Tier'
+      description: Select Storage Tier
+      signpost: Select Storage Tier
+      type:
+        dataType: string
+        isMultiple: false
+      default: 'cas.storage.profile.tier:silver'
+      valueList:
+        - value: ''
+          label: '* ANY *'
+        - value: 'cas.storage.profile.tier:silver'
+          label: Silver
+        - value: 'cas.storage.profile.tier:bronze'
+          label: Bronze
+        - value: 'cas.storage.profile.tier:gold'
+          label: Gold
+        - value: 'cas.storage.profile.cap:pci'
+          label: PCI
+      constraints: {}
+    volume2count:
+      label: 2 Volume Count?
+      description: Add additional volume
+      signpost: Add additional volume
+      type:
+        dataType: integer
+        isMultiple: false
+      default: 0
+      constraints:
+        min-value: 0
+        max-value: 20
+    volume2size:
+      label: '2: Volume Size'
+      type:
+        dataType: integer
+        isMultiple: false
+      default: 100
+    volume2storage:
+      label: '2: Storage Tier'
+      description: Select Storage Tier
+      signpost: Select Storage Tier
+      type:
+        dataType: string
+        isMultiple: false
+      default: 'cas.storage.profile.tier:silver'
+      valueList:
+        - value: ''
+          label: '* ANY *'
+        - value: 'cas.storage.profile.tier:silver'
+          label: Silver
+        - value: 'cas.storage.profile.tier:bronze'
+          label: Bronze
+        - value: 'cas.storage.profile.tier:gold'
+          label: Gold
+        - value: 'cas.storage.profile.cap:pci'
+          label: PCI
+  options:
+    externalValidations: []
+#-------------------------INPUTS-------------------------#
+inputs:
+  image:
+    type: string
+    description: Select image
+    default: centos-74-livefire-image
+    title: Image
+    oneOf:
+      - title: CentOS 7.4
+        const: centos-74-image
+      - title: CentOS 7.4 (Livefire)
+        const: centos-74-livefire-image
+  flavour:
+    type: string
+    enum:
+      - micro
+      - small
+    description: Select the size of the deployment.
+    default: micro
+    title: Flavour (Size)
+  environment:
+    type: string
+    description: 'Select the development, testing, or production environment .'
+    default: 'cas.cloud.zone.env:dev'
+    title: Environment
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: Development
+        const: 'cas.cloud.zone.env:dev'
+      - title: Test
+        const: 'cas.cloud.zone.env:test'
+      - title: Prodiction
+        const: 'cas.cloud.zone.env:prod'
+  cloudZone:
+    type: string
+    description: Select Public CLoud.
+    default: 'cas.cloud.zone.source:aws'
+    title: Cloud
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: AWS
+        const: 'cas.cloud.zone.source:aws'
+      - title: Azure
+        const: 'cas.cloud.zone.source:azure'
+      - title: GCP
+        const: 'cas.cloud.zone.source:gcp'
+      - title: VMC
+        const: 'cas.cloud.zone.source:vmc'
+  cloudAccountOwner:
+    type: string
+    description: Select Public CLoud Owner.
+    default: 'cas.cloud.account.owner:elastic_sky'
+    title: Owner
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: ElasticSky
+        const: 'cas.cloud.account.owner:elastic_sky'
+  network:
+    type: string
+    description: Select Network to Attach to
+    default: 'cas.network.type:public'
+    title: Network
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: Public
+        const: 'cas.network.type:public'
+      - title: Private
+        const: 'cas.network.type:private'
+  storageTier:
+    type: string
+    description: Select Storage Tier
+    default: 'cas.storage.profile.tier:silver'
+    title: Storage Tier
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: Silver
+        const: 'cas.storage.profile.tier:silver'
+      - title: Bronze
+        const: 'cas.storage.profile.tier:bronze'
+      - title: Gold
+        const: 'cas.storage.profile.tier:gold'
+      - title: PCI
+        const: 'cas.storage.profile.cap:pci'
+  resourceGroup:
+    type: string
+    description: Select Resource Group
+    default: Static
+    title: Resource Group
+    oneOf:
+      - title: Static
+        const: Static
+      - title: Dynamic
+        const: ''
+      - title: VMC (Workloads)
+        const: Workloads
+  breakLine01:
+    type: string
+    default: '----------------------------------------------------------------------'
+    title: '------------------------------------------------------'
+    readOnly: true
+  volume1count:
+    type: integer
+    description: Add additional volume
+    default: 0
+    title: '1: Volume Count?'
+    minimum: 0
+    maximum: 20
+  volume1size:
+    type: integer
+    default: 50
+    title: '1: Volume Size'
+  volume1storage:
+    type: string
+    description: Select Storage Tier
+    default: 'cas.storage.profile.tier:silver'
+    title: '1: Storage Tier'
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: Silver
+        const: 'cas.storage.profile.tier:silver'
+      - title: Bronze
+        const: 'cas.storage.profile.tier:bronze'
+      - title: Gold
+        const: 'cas.storage.profile.tier:gold'
+      - title: PCI
+        const: 'cas.storage.profile.cap:pci'
+  volume2count:
+    type: integer
+    description: Add additional volume
+    default: 0
+    title: 2 Volume Count?
+    minimum: 0
+    maximum: 20
+  volume2size:
+    type: integer
+    default: 100
+    title: '2: Volume Size'
+  volume2storage:
+    type: string
+    description: Select Storage Tier
+    default: 'cas.storage.profile.tier:silver'
+    title: '2: Storage Tier'
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: Silver
+        const: 'cas.storage.profile.tier:silver'
+      - title: Bronze
+        const: 'cas.storage.profile.tier:bronze'
+      - title: Gold
+        const: 'cas.storage.profile.tier:gold'
+      - title: PCI
+        const: 'cas.storage.profile.cap:pci'
+#-------------------------RESOURCES-------------------------#
+resources:
+  app-net:
+    type: Cloud.Network
+    properties:
+      tags:
+        - value: class-delivery
+          key: cas-resource-desc
+      name: net-tito-web
+      networkType: existing
+      constraints:
+        - tag: '${input.network}'
+  db-tier:
+    type: Cloud.Machine
+    properties:
+      tags:
+        - value: class-delivery
+          key: cas-resource-desc
+      constraints:
+        - tag: '${input.cloudZone}'
+        - tag: '${input.environment}'
+        - tag: '${input.cloudAccountOwner}'
+      name: vm-tito-db
+      flavor: '${input.flavour}'
+      image: '${input.image}'
+      storage:
+        disks:
+          - capacityGb: 4
+        constraints:
+          - tag: '${input.storageTier}'
+      networks:
+        - network: '${resource["app-net"].id}'
+      remoteAccess:
+        authentication: publicPrivateKey
+        sshKey: www.kaloferov.com
+      # If you are attaching to a multi-instance machine , use the following to add volume 1 to all instances:
+      # attachedDisks: '${map_to_object(resource.volume1[0].id, "source")}'  
+      attachedDisks: '${map_to_object(resource.volume1[*].id + resource.volume2[*].id, "source")}'
+  volume1:
+    type: Cloud.Volume
+    properties:
+      count: '${input.volume1count}'
+      capacityGb: '${input.volume1size}'
+      constraints:
+        - tag: '${input.volume1storage}'
+  volume2:
+    type: Cloud.Volume
+    properties:
+      count: '${input.volume2count}'
+      capacityGb: '${input.volume2size}'
+      constraints:
+        - tag: '${input.volume2storage}'

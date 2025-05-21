@@ -1,0 +1,58 @@
+#--------------------------------------------------------#
+#                     Spas Kaloferov                     #
+#                   www.kaloferov.com                    #
+# bit.ly/The-Twitter      Social     bit.ly/The-LinkedIn #
+# bit.ly/The-Gitlab        Git         bit.ly/The-Github #
+# bit.ly/The-BSD         License          bit.ly/The-GNU #
+#--------------------------------------------------------#
+info: |-
+  #
+  # VMware Cloud Assembly Blueprint Sample
+  # - Creates/Updates a Route53 A Record 
+  # 
+name: AWS - Route53 A Record
+version: 1
+#-------------------------INPUTS-------------------------#
+inputs:
+  region:
+    type: string
+    title: Region
+    default: us-west-2
+    readOnly: true
+    description: Enter Route53 Region
+  route53_zone_id:
+    type: string
+    title: Route53 Zone ID
+    default: ENTER ZONE ID HERE
+    readOnly: true
+    description: Enter Route53 Zone ID
+  dns_name:
+    type: string
+    title: DNS Name
+    readOnly: true
+    default: ENTER DNS (FQDN) NAME HERE
+    pattern: '[a-z]'
+    description: Enter (FQDN) DNS Name
+  elb_dns_name:
+    type: string
+    title: ELB DNS Name / IP
+    description: Enter Route53 ELB DNS Name / IP Address
+  ttl:
+    type: string
+    title: TTL
+    default: 300
+    description: Enter TTL value
+#------------------------RESOURCES-----------------------#
+resources:
+  aws-route53-a:
+    type: Cloud.Service.AWS.Route53.Record
+    preventDelete: true
+    properties:
+      name: ${input.dns_name}
+      type: A
+      ttl: ${input.ttl}
+      records: 
+        - ${input.elb_dns_name}
+      region: ${input.region}
+      zone_id: ${input.route53_zone_id}
+      account: AWS Cloud

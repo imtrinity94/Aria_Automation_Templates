@@ -1,0 +1,52 @@
+#--------------------------------------------------------#
+#                     Spas Kaloferov                     #
+#                   www.kaloferov.com                    #
+# bit.ly/The-Twitter      Social     bit.ly/The-LinkedIn #
+# bit.ly/The-Gitlab        Git         bit.ly/The-Github #
+# bit.ly/The-BSD         License          bit.ly/The-GNU #
+#--------------------------------------------------------#
+info: |-
+  #
+  #     VMware Cloud Assembly Blueprint Code Sample     
+  #
+  # - Creates an S3 bucket Policy. 
+  # - Add an AWS Principal ARN or auto-add requestor user
+  #
+name: AWS - S3 Create Policy
+version: 1
+#-------------------------INPUTS-------------------------#
+inputs:
+  s3-bucket-name:
+    type: string
+    title: S3 Bucket Name
+    minLength: 1
+    description: Enetr S3 Bucket Name
+  aws-principal-arn:
+    type: string
+    title: AWS Principal ARN
+    description: AWS Principal ARN or leave empty to auto-add requestor user
+    default: ''
+#------------------------RESOURCES-----------------------#
+resources:
+  s3-bucket-policy:
+    type: Cloud.Service.AWS.S3.Bucket.Policy
+    properties:
+      bucket: '${input.s3-bucket-name}'
+      policy: |
+        {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Effect": "Allow",
+              "Resource": "arn:aws:s3:::${input.s3-bucket-name}",
+              "Principal": {
+                "AWS": [
+                  "${input.aws-principal-arn == '' ? 'arn:aws:iam::<TODO_ENTER_ACCOUNT_ID>:user/'+trim(replace(env.requestedBy,'@vmware.com',' ')) : trim(input.aws-principal-arn) }"
+                ]
+              }
+            }
+          ]
+        }
+      region: us-west-2 # e.g. us-west-2
+      account: AWS Cloud # e.g. AWS Cloud

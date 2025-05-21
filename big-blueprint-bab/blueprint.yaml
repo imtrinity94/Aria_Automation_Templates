@@ -1,0 +1,1498 @@
+#--------------------------------------------------------#
+#                     Spas Kaloferov                     #
+#                   www.kaloferov.com                    #
+# bit.ly/The-Twitter      Social     bit.ly/The-LinkedIn #
+# bit.ly/The-Gitlab        Git        bit.ly/The-Youtube #
+# bit.ly/The-BSD         License          bit.ly/The-GNU #
+#--------------------------------------------------------#
+info: |-
+  #
+  #     VMware Cloud Assembly Blueprint Code Sample     
+  # 
+name: Big Blueprint (BAB)
+version: 1
+options:
+  # Options as per http://kaloferov.com/blog/skkb1051
+  gitlabSyncEnable: false
+  gitlabSyncDelete: false
+  awsSesEmailEnable: false
+  slackPostEnable: false
+#-------------------------INPUTS-------------------------#
+inputs:
+  image:
+    comment: |
+      # Example of an String oneOf drop-down input. The 
+      # difference here from a standard one is that the const 
+      # value string contains multiple pieces of information. 
+      # E.g. the name of the image for the image profile and 
+      # the name of a custom spec , which will be used only if 
+      # deployed on vSphere. When referenced in the blueprint 
+      # the input/const will be split as an array and the 
+      # different members ([0], [1]) will gives us the 
+      # different values separated the comma.
+    type: string
+    description: <b> Select image and custom spec </b>
+    default: 'centos-74-livefire-image,CentOS7'
+    title: Image & Spec
+    oneOf:
+      - title: CentOS 7.4 (No Spec)
+        const: 'centos-74-image,'
+      - title: 'CentOS 7.4 (Livefire v0.2, CentOS7 Spec)'
+        const: 'centos-74-livefire-image,CentOS7'
+      - title: 'CentOS 7.4 (Livefire v0.1, CentOS7 Spec)'
+        const: 'centos-74-livefire-image-v01,CentOS7'
+  flavour:
+    comment: |
+      # Example of an String enum drop-down input. The 
+      # description field provides examples of using basic 
+      # bold <b></b> and break <br> html tags. 
+    type: string
+    enum:
+      - micro
+      - small
+      - medium
+      - large
+    description: |-
+      <b> Select the size of the deployment. </b> <br>
+      Micro = 1 CPU - 1 GB RAM, <br>
+      Small =  1 CPU - 2 GB RAM, <br>
+      Medium = 2 CPU - 4 GB RAM, <br> 
+      Large = 2 CPU - 8 GB RAM <br>
+    default: micro
+    title: Flavour
+  environment:
+    comment: |
+      # Example of an String oneOf drop-down input. Provides
+      # user friendly dropdown values. Values are capability
+      # tags used for constraints throughout the blueprint. 
+      # Examples shows also how we can assign NO constraints
+      # by providing an empty '' const value.
+    type: string
+    description: '<b> Select the development, testing, or production environment . </b> <br>'
+    default: 'cas.cloud.zone.env:dev'
+    title: Environment
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: Development
+        const: 'cas.cloud.zone.env:dev'
+      - title: Test
+        const: 'cas.cloud.zone.env:test'
+      - title: Prodiction
+        const: 'cas.cloud.zone.env:prod'
+  cloudZone:
+    comment: |
+      # Example of an String oneOf drop-down input. 
+    type: string
+    description: <b> Select Public CLoud. </b> <br>
+    default: 'cas.cloud.zone.type:aws'
+    title: Cloud
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: AWS
+        const: 'cas.cloud.zone.type:aws'
+      - title: Azure
+        const: 'cas.cloud.zone.type:azure'
+      - title: GCP
+        const: 'cas.cloud.zone.type:gcp'
+      - title: VMC
+        const: 'cas.cloud.zone.type:vmc'
+      - title: vCenter
+        const: 'cas.cloud.zone.type:vcenter'
+  compute:
+    comment: ''
+    type: string
+    description: <b> Select Cloud Zone Compute </b> <br>
+    default: ''
+    title: Compute
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: Compute A
+        const: 'cas.compute.cap:a'
+      - title: Compute B
+        const: 'cas.compute.cap:b'
+      - title: Compute C
+        const: 'cas.compute.cap:c'
+      - title: Compute D
+        const: 'cas.compute.cap:d'
+  storageTier:
+    comment: |
+      # Example of an String oneOf drop-down input. 
+    type: string
+    description: <b> Select Storage Tier </b> <br>
+    default: 'cas.storage.profile.tier:silver'
+    title: Storage Tier
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: Silver
+        const: 'cas.storage.profile.tier:silver'
+      - title: Bronze
+        const: 'cas.storage.profile.tier:bronze'
+      - title: Gold
+        const: 'cas.storage.profile.tier:gold'
+      - title: PCI
+        const: 'cas.storage.profile.cap:pci'
+  network:
+    comment: |
+      # Example of an String oneOf drop-down input. 
+    type: string
+    description: <b> Select Network to Attach to </b> <br>
+    default: 'cas.network.type:public'
+    title: Network
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: Public
+        const: 'cas.network.type:public'
+      - title: Private
+        const: 'cas.network.type:private'
+  ipAssignment:
+    comment: |
+      # Example of an String oneOf drop-down input. 
+    type: string
+    description: <b> Select IP Assignment Method </b> <br>
+    default: dynamic
+    title: IP Assignment
+    oneOf:
+      - title: Dynamic
+        const: dynamic
+      - title: Static
+        const: static
+  loadLabancer:
+    comment: |
+      # Example of an Interger oneOf drop-down input. 
+    type: integer
+    description: <b> Select whatever to deploy an Load Balancer </b> <br>
+    default: 0
+    title: Deploy LB?
+    oneOf:
+      - title: 'Yes'
+        const: 1
+      - title: 'No'
+        const: 0
+  webCount:
+    comment: |
+      # Example of an Interger oneOf drop-down input. 
+    type: integer
+    description: <b> Web Frontend Size (Number of nodes)  </b> <br>
+    default: 0
+    title: Count (Web)
+    minimum: 0
+    maximum: 10
+  webSplit:
+    comment: |
+      # Used for the Web Tier to split/load-balance VM's it into 
+      # different computes. vSphere Only
+    type: boolean
+    description: <b> Split Web Tiers into different computes  </b> <br>
+    title: Split (Web)?
+  webSplitLocations:
+    comment: |
+      # Used to specify cloud zones for the Web Tier VM split 
+    type: array
+    title: Split Locations (Web)
+    description: <b>Enter Locations for the Web Tier VM split. vSphere Only </b>
+    minItems: 0
+    maxItems: 2
+    items:
+      type: object
+      properties:
+        location:
+          type: string
+          title: Location
+          oneOf:
+            - title: Compute A
+              const: 'cas.compute.cap:a'
+            - title: Compute B
+              const: 'cas.compute.cap:b'
+            - title: Compute C
+              const: 'cas.compute.cap:c'
+            - title: Compute D
+              const: 'cas.compute.cap:d'
+  webFlavor:
+    type: array
+    title: Flavour (Web)
+    description: <b>Enter additional volume information </b>
+    minItems: 0
+    maxItems: 10
+    items:
+      type: object
+      properties:
+        flavor:
+          type: string
+          title: Flavor
+          description: |-
+            <b> Select the size of the deployment. </b> <br>
+            Micro = 1 CPU - 1 GB RAM, <br>
+            Small =  1 CPU - 2 GB RAM, <br>
+            Medium = 2 CPU - 4 GB RAM, <br> 
+            Large = 2 CPU - 8 GB RAM <br>
+          enum:
+            - micro
+            - small
+            - medium
+            - large
+  drCloudAccount:
+    comment: |
+      # Example of an String oneOf drop-down input. 
+    type: string
+    description: |-
+      <b> Select DR Site . </b> <br>
+      For vCenter deployments only
+    default: ''
+    title: DR Site (vCenter)
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: Primary (Soft)
+        const: 'cas.cloud.account.cap:primary:soft'
+      - title: Hotspare (Soft)
+        const: 'cas.cloud.account.cap:hotspare:soft'
+  cloudAccountOwner:
+    comment: |
+      # Example of an String oneOf drop-down input. 
+      # This is a Capability Tag set on the Cloud Account level.
+    type: string
+    description: |-
+      <b> Select Public CLoud Owner. </b> <br>
+      This is a Capability Tag set on the Cloud Account level.
+    default: ''
+    title: Owner
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: ElasticSky
+        const: 'cas.cloud.account.owner:elastic_sky'
+  line9:
+    type: string
+    title: ''
+    readOnly: true
+    default: '- - - - - - - - - - - - - - - - - N E T W O R K - - - - - - - - - - - - - - - - - - -'
+  webOndemandNet:
+    comment: |
+      # Example of a boolean input. 
+    type: boolean
+    description: <b> Web Tier Second NIC  </b> <br>
+    default: false
+    title: Web 2nd NIC ?
+  network2:
+    comment: null
+    type: string
+    description: <b> Select Network to Attach to </b> <br>
+    default: 'cas.network.type:public'
+    title: Web 2nd NIC - Network
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: Public
+        const: 'cas.network.type:public'
+      - title: Private
+        const: 'cas.network.type:private'
+  ipAssignment2:
+    comment: |
+      # Example of an String oneOf drop-down input. 
+    type: string
+    description: <b> Select IP Assignment Method </b> <br>
+    default: dynamic
+    title: Web 2nd NIC - IP Assignment
+    oneOf:
+      - title: Dynamic
+        const: dynamic
+      - title: Static
+        const: static
+  line8:
+    type: string
+    title: ''
+    readOnly: true
+    default: '- - - - - - - - - - - - - - - - - - S T O R A G E - - - - - - - - - - - - - - - - - - -'
+  volumes-db:
+    type: array
+    title: Additional Volumes (DB)
+    description: <b>Enter additional volume information </b>
+    minItems: 0
+    maxItems: 10
+    items:
+      type: object
+      properties:
+        name:
+          type: string
+          title: Name
+          default: vol-
+          description: <b> Enter volume name. </b>
+        capacity:
+          type: integer
+          title: Capacity
+          description: |-
+            <b> Enter Volume capacity. </b> <br> 
+            Acceptable values: 4-1000 GB<br>
+          minimum: 4
+          maximum: 1000
+        storageTier:
+          type: string
+          title: Tier
+          default: 'cas.storage.profile.tier:silver'
+          description: <b> Select Storage Tier. </b>
+          oneOf:
+            - title: '* ANY *'
+              const: ''
+            - title: Silver
+              const: 'cas.storage.profile.tier:silver'
+            - title: Bronze
+              const: 'cas.storage.profile.tier:bronze'
+            - title: Gold
+              const: 'cas.storage.profile.tier:gold'
+            - title: PCI
+              const: 'cas.storage.profile.cap:pci'
+        storagePolicy:
+          type: string
+          title: Policy
+          default: 'cas.storage.policy:low_io'
+          description: |-
+            <b> Select Storage Policy.</b> <br> 
+            This only applies for vCenter deployments<br>
+          oneOf:
+            - title: '* ANY *'
+              const: ''
+            - title: High IO
+              const: 'cas.storage.policy:high_io'
+            - title: Low IO
+              const: 'cas.storage.policy:low_io'
+  volumesWebCount:
+    type: integer
+    title: Vols / VM (Web)
+    description: <b>Enter total number of volumes to be added per  machine resource </b>
+    default: 0
+    minimum: 0
+    maximum: 10
+  volumesWebSameSpecs:
+    type: boolean
+    title: Same Vol Specs / VM (Web)
+    description: |-
+      <b>Use same or different Volume Specs for each machine resource. </b><br> 
+      <b>When selected</b> the "Additional Volumes (Web)" input must specify only volume 
+      info for one set of disks. This will be used for all other machine resources. 
+      e.g. if "Vols / VM (Web)" = 2  then "Additional Volumes (Web)" must contain 2 entries  <br>
+      <b>When NOT selected</b> the "Additional Volumes (Web)" input must specify volume info
+      for all volumes for all machine instances. e.g. if "Vols / VM (Web)" = 2 and 
+      "Count (Web)" = 2, then "Additional Volumes (Web)" must contain 4 entries 
+      for all volumes <br>
+    default: true
+  volumes-web:
+    type: array
+    title: Additional Volumes (Web)
+    description: <b>Enter additional volume information. Must match number of Web isntances being dpeloyed </b>
+    minItems: 0
+    maxItems: 10
+    items:
+      type: object
+      properties:
+        name:
+          type: string
+          title: Name
+          default: vol-
+          description: <b> Enter volume name. </b>
+        capacity:
+          type: integer
+          title: Capacity
+          description: |-
+            <b> Enter Volume capacity. </b> <br> 
+            Acceptable values: 4-1000 GB<br>
+          minimum: 4
+          maximum: 1000
+        storageTier:
+          type: string
+          title: Tier
+          default: 'cas.storage.profile.tier:silver'
+          description: <b> Select Storage Tier. </b>
+          oneOf:
+            - title: '* ANY *'
+              const: ''
+            - title: Silver
+              const: 'cas.storage.profile.tier:silver'
+            - title: Bronze
+              const: 'cas.storage.profile.tier:bronze'
+            - title: Gold
+              const: 'cas.storage.profile.tier:gold'
+            - title: PCI
+              const: 'cas.storage.profile.cap:pci'
+        storagePolicy:
+          type: string
+          title: Policy
+          default: 'cas.storage.policy:low_io'
+          description: |-
+            <b> Select Storage Policy.</b> <br> 
+            This only applies for vCenter deployments<br>
+          oneOf:
+            - title: '* ANY *'
+              const: ''
+            - title: High IO
+              const: 'cas.storage.policy:high_io'
+            - title: Low IO
+              const: 'cas.storage.policy:low_io'
+  line4:
+    type: string
+    title: ''
+    readOnly: true
+    default: '- - - - - - - - - - - - - - R E M O T E  A C C E S S - - - - - - - - - - - - - - - -'
+  remoteAcessAuth:
+    type: string
+    title: Remote Access Method
+    default: publicPrivateKey
+    description: <b> Select Remote Access Method. </b> <br>
+    enum:
+      - generatedPublicPrivatekey
+      - publicPrivateKey
+      - keyPairName
+      - usernamePassword
+  remoteAcessKey:
+    type: string
+    title: SSH Key
+    default: ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEAp7fYaIex88KRGhNWTYIwqJn/jtDp9ZV71WtBSpi9/LFhMh0f87n+W8Ms3QgA2WdEcTJRLoc3blHGo3a6TIqDGuVmGwgJjXpQA65aHjQS5P3gv86vDELuTlKev3BumcvmqpGeoyKY4zn4RLtdiWDCLI+rMEkWAPyV7RbbNzuaJoQUKTdfv1iBfWo0thoQzTj9KluTgM6FWXz7iyNB4J7NXIeYfxfbQgl3mAGdQkc11cgrnfFfjIRVA/nE5pUbOErJ9cUEMscb5iXMPQvs2zKcfZ0FYd4+TwfRpPwzYVC/vmS9kO7jrGQbtkOzTyf1GqOXCQ4URX2cPWS4zthXS5gm5Q==
+    description: <b> Enter SSH Key to be used with publicPrivateKey remote access method. </b> <br>
+  remoteAcessKeyPairName:
+    type: string
+    title: SSH Key Pair Name
+    default: controlcenter
+    description: <b> Enter SSH Key Pair Name to be used with keyPairName remote access method. </b> <br>
+  remoteAcessUsername:
+    type: string
+    title: Username
+    default: vmware
+    description: <b> Enter Username to be used with usernamePassword remote access method. </b> <br>
+  remoteAcessPassword:
+    type: string
+    encrypted: true
+    title: Password
+    default: VMware1!
+    description: <b> Enter Password to be used with usernamePassword remote access method. </b> <br>
+  line7:
+    type: string
+    title: ''
+    readOnly: true
+    default: '- - - - - - - - - - - - - - - - - - - - T A G S - - - - - - - - - - - - - - - - - - - - -'
+  tagsOptional:
+    comment: |
+      # Tag Pattern: Only hyphens (-), underscores (_), lowercase characters, and 
+      # numbers are allowed. Keys must start with a lowercase character. Pattern is cloud agnostic 
+    encrypted: true
+    type: array
+    description: |-
+      <b> Enter tags that will be attached to the provisioned resources. </b> <br>
+      Allowed characters for cloud agnostic blueprints:  <br>
+      Only hyphens (-), underscores (_), lowercase characters, and numbers are allowed. <br>
+    title: Optional Tags
+    items:
+      type: object
+      properties:
+        key:
+          type: string
+          title: Key
+          description: 'Only hyphens (-), underscores (_), lowercase characters, and numbers are allowed.'
+          pattern: '^[-a-z0-9\-\_]*$'
+        value:
+          type: string
+          title: Value
+          description: 'Only hyphens (-), underscores (_), lowercase characters, and numbers are allowed.'
+          pattern: '^[-a-z0-9\-\_]*$'
+  tagsRequired:
+    comment: |
+      # Tag Pattern: Only hyphens (-), underscores (_), lowercase characters, and 
+      # numbers are allowed. Keys must start with a lowercase character. Pattern is cloud agnostic 
+    type: array
+    description: |-
+      <b> Required tags that will be attached to the provisioned resources. </b> <br>
+      Allowed characters for cloud agnostic blueprints:  <br>
+      Only hyphens (-), underscores (_), lowercase characters, and numbers are allowed. <br>
+    default:
+      - value: class-delivery
+        key: cas-resource-desc
+      - value: vra-cloud
+        key: cas-resource-source
+    title: Required Tags
+    pattern: null
+    items:
+      type: object
+      properties:
+        key:
+          type: string
+          title: Key
+          description: 'Only hyphens (-), underscores (_), lowercase characters, and numbers are allowed.'
+          pattern: '^[-a-z0-9\-\_]*$'
+        value:
+          type: string
+          title: Value
+          description: 'Only hyphens (-), underscores (_), lowercase characters, and numbers are allowed.'
+          pattern: '^[-a-z0-9\-\_]*$'
+    readOnly: true
+  line0:
+    type: string
+    title: ''
+    readOnly: true
+    default: '- - - - - - - - - - - - - - - - - - v S P H E R E - - - - - - - - - - - - - - - - - - - -'
+  lineStoragePolicy:
+    type: string
+    title: ''
+    readOnly: true
+    default: Use Storage Constraint Tags
+  storagePolicyTag:
+    comment: |
+      # This will assign a particular storage policy by TAG.
+      # This requires that there are no Storage Profiles 
+      # configured for the given Cloud zone. These are Tags
+      # configured in Resources > Storage >  Storage Policy.
+    type: string
+    description: |-
+      <b> Select Storage Policy by Tag</b> <br>
+      Requires that there is no Storage Profile for the Zone. 
+    default: ''
+    title: Storage Policy (Tag)
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: 'cas.storage.policy:high_io'
+        const: 'cas.storage.policy:high_io'
+      - title: 'cas.storage.policy:low_io'
+        const: 'cas.storage.policy:low_io'
+  datastoreClusterTag:
+    comment: |
+      # This will assign a particular Datastore/Cluster by TAG
+      # This requires that there are no Storage Profiles 
+      # configured for the given Cloud zone. These are Tags
+      # configured in Resources > Storage > Datastores/Clusters.
+    type: string
+    description: |-
+      <b> Select Datastore or Cluster by Tag</b> <br>
+      Requires that there is no Storage Profile for the Zone. 
+    default: ''
+    title: DS/Cluster (Tag)
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: 'cas.storage.cluster.id:comp'
+        const: 'cas.storage.cluster.id:comp'
+      - title: 'cas.storage.cluster.id:mgmt'
+        const: 'cas.storage.cluster.id:mgmt'
+      - title: 'cas.storage.datastore.id:comp'
+        const: 'cas.storage.datastore.id:comp'
+      - title: 'cas.storage.datastore.id:mgmt'
+        const: 'cas.storage.datastore.id:mgmt'
+  lineDatastoreCluster:
+    type: string
+    title: ''
+    readOnly: true
+    default: OR use dataStore and storageProfile Properties
+  storagePolicyName:
+    comment: |
+      # This will assign a particular storage policy by NAME.
+      # This requires that there are no Storage Profiles 
+      # configured for the given Cloud zone. These are Names
+      # configured in Resources > Storage > Storage Policy.
+    type: string
+    description: |-
+      <b> Select Storage Policy by Name</b> <br>
+      Requires that there is no Storage Profile for the Zone. 
+    default: ''
+    title: Storage Policy (Name)
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: ElasticSky Low IO Storage Policy
+        const: ElasticSky Low IO Storage Policy
+      - title: ElasticSky High IO Storage Policy
+        const: ElasticSky High IO Storage Policy
+  datastoreClusterName:
+    comment: |
+      # This will assign a particular Datastore/Cluster by NAME
+      # This requires that there are no Storage Profiles 
+      # configured for the given Cloud Zone. These are Names
+      # configured in Resources > Storage > Datastores/Clusters.
+    type: string
+    description: |-
+      <b> Select Datastore or Cluster by Name</b> <br>
+      Requires that there is no Storage Profile for the Zone. 
+    default: ''
+    title: DS/Cluster (Name)
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: RegionA01-ISCSI02-COMP01
+        const: RegionA01-ISCSI02-COMP01
+      - title: RegionA01-ISCSI01-MGMT01
+        const: RegionA01-ISCSI01-MGMT01
+      - title: RegionA01-COMP-DSCluster01
+        const: RegionA01-COMP-DSCluster01
+      - title: RegionA01-MGMT-DSCluster01
+        const: RegionA01-MGMT-DSCluster01
+  line1:
+    type: string
+    title: ''
+    readOnly: true
+    default: '- - - - - - - - - - - - - - - - - - - A Z U R E - - - - - - - - - - - - - - - - - - - - -'
+  resourceGroupType:
+    type: string
+    description: |-
+      <b> Select Resource Group Type. </b> <br>
+      <b> On-Demand </b>(Azure) - creates an on-demand security group for each deployment. <br>
+      <b> Predefined </b>(Azure,VMC,vCenter) - uses predefined RG for the deployment Region. <br>
+      <b> Existing </b>(Azure,VMC,vCenter) - Uses existing RG Group. Name must be provided in next field.  <br>
+      <b> Create Custom </b>(Azure,VMC,vCenter) - Create new RG . Must Specify RG Name input <br>
+    default: ondemand
+    title: RG Type
+    oneOf:
+      - title: Predefined
+        const: predefined
+      - title: On-Demand
+        const: ondemand
+      - title: Existing
+        const: existing
+      - title: Create Custom
+        const: createcustom
+  resourceGroupName:
+    comment: |
+      # resourceGroupName pattern: Matching pattern as per Azure specs: 
+      # Resource group names only allow alphanumeric characters, periods, 
+      # underscores, hyphens and parenthesis and cannot end in a period.
+      # Added "/" and " " to support vCenter folder names  
+    type: string
+    description: |-
+      <b> Enter Existing Resource Group Name. </b> <br> 
+      Allowed characters for cloud agnostic blueprints:  <br>
+      alphanumeric characters, periods, underscores, hyphens and parenthesis. <br>
+      Valid only for Azure, VMC and vCenter deployments. <br>
+    default: ''
+    title: RG Name
+  line2:
+    type: string
+    title: ''
+    readOnly: true
+    default: '- - - - - - - - - - - - - - - E X T E N S I B I L I T Y - - - - - - - - - - - - - - - -'
+  abx_autoDeleteDeployment:
+    comment: |
+      # Auto Delete Failed Deployment using ABX Action. 
+      # Ref: http://kaloferov.com/blog/skkb1057/
+    type: string
+    description: <b>Auto Delete Failed or Canceled Deployment.</b>
+    default: 'No'
+    title: Auto Delete (ABX)
+    #format: hidden
+    enum:
+      - 'Yes'
+      - 'No'
+  line3:
+    type: string
+    title: ''
+    readOnly: true
+    default: '- - - - - - - - - - - - - - - - - - - - S A L T - - - - - - - - - - - - - - - - - - - - - -'
+  sseMinionInstall:
+    comment: |
+      # Used by cloudConfig to install  SaltStack Config (SSC) Minion Agent.
+    type: string
+    description: <b>Select to install SSC Minion Agent.</b>
+    default: 'No'
+    title: Salt Minion Install
+    enum:
+      - 'Yes'
+      - 'No'
+  sseMinionGrains:
+    comment: |
+      # Used by cloudConfig to add Custom Salt Minion Grains from an User Input.
+    encrypted: true
+    type: array
+    description: |-
+      <b> Enter Custom Minion Grains </b> <br>
+      Allowed characters:  <br>
+      Only hyphens (-), underscores (_), lowercase characters, and numbers are allowed. <br>
+    title: Salt Minion Grains
+    items:
+      type: object
+      properties:
+        key:
+          type: string
+          title: Name
+          description: 'Only hyphens (-), underscores (_), lowercase characters, and numbers are allowed.'
+          pattern: '^[-a-z0-9\-\_]*$'
+        value:
+          type: string
+          title: Value
+          description: 'Only hyphens (-), underscores (_), lowercase characters, and numbers are allowed.'
+          pattern: '^[-a-z0-9\-\_]*$'
+  line5:
+    type: string
+    title: ''
+    readOnly: true
+    default: '- - - - - - - - - - - - - - - - - T E R R A F O R M - - - - - - - - - - - - - - - - -'
+  awsSgCreateCount:
+    comment: ''
+    type: integer
+    description: <b> Create AWS SG? </b> <br>
+    default: 0
+    title: Create AWS SG?
+    oneOf:
+      - title: 'Yes'
+        const: 1
+      - title: 'No'
+        const: 0
+  awsSgIngressRules:
+    type: array
+    title: SG Ingress Rules
+    items:
+      type: object
+      properties:
+        from_port:
+          type: string
+          title: fromPort *
+          minLength: 1
+          maxLength: 5
+          pattern: '^((6553[0-5])|(655[0-2][0-9])|(65[0-4][0-9]{2})|(6[0-4][0-9]{3})|([1-5][0-9]{4})|([0-5]{0,5})|([0-9]{1,4}))$'
+          description: (Required) The start port (or ICMP type number if protocol is "icmp" or "icmpv6").
+        to_port:
+          type: string
+          title: toPort *
+          minLength: 1
+          maxLength: 5
+          pattern: '^((6553[0-5])|(655[0-2][0-9])|(65[0-4][0-9]{2})|(6[0-4][0-9]{3})|([1-5][0-9]{4})|([0-5]{0,5})|([0-9]{1,4}))$'
+          description: (Required) The end port (or ICMP code if protocol is "icmp").
+        protocol:
+          type: string
+          title: protocol *
+          default: TCP
+          enum:
+            - TCP
+            - UDP
+            - Echo Replay
+            - IPv6 ICMP
+            - ICMP
+            - All
+          description: '(Required) The protocol. If not icmp, icmpv6, tcp, udp, or all use the protocol number'
+        cidr_blocks:
+          type: string
+          title: cidr_blocks *
+          default: 0.0.0.0/0
+          pattern: '^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/\d+$'
+          minLength: 9
+          maxLength: 19
+          description: (Optional) List of CIDR blocks. Cannot be specified with source_security_group_id.
+        #ipv6_cidr_blocks:
+        #  type: string
+        #  title: ipv6_cidr_blocks
+        #  description: (Optional) List of IPv6 CIDR blocks.
+        description:
+          type: string
+          title: description *
+          minLength: 1
+          default: ingress
+          description: (Optional) Description of the rule.
+  awsSgEgressRules:
+    type: array
+    title: SG Egress Rules
+    items:
+      type: object
+      properties:
+        from_port:
+          type: string
+          title: fromPort *
+          minLength: 1
+          maxLength: 5
+          pattern: '^((6553[0-5])|(655[0-2][0-9])|(65[0-4][0-9]{2})|(6[0-4][0-9]{3})|([1-5][0-9]{4})|([0-5]{0,5})|([0-9]{1,4}))$'
+          description: (Required) The start port (or ICMP type number if protocol is "icmp" or "icmpv6").
+        to_port:
+          type: string
+          title: toPort *
+          minLength: 1
+          maxLength: 5
+          pattern: '^((6553[0-5])|(655[0-2][0-9])|(65[0-4][0-9]{2})|(6[0-4][0-9]{3})|([1-5][0-9]{4})|([0-5]{0,5})|([0-9]{1,4}))$'
+          description: (Required) The end port (or ICMP code if protocol is "icmp").
+        protocol:
+          type: string
+          title: protocol *
+          default: TCP
+          enum:
+            - TCP
+            - UDP
+            - Echo Replay
+            - IPv6 ICMP
+            - ICMP
+            - All
+          description: '(Required) The protocol. If not icmp, icmpv6, tcp, udp, or all use the protocol number'
+        cidr_blocks:
+          type: string
+          title: cidr_blocks *
+          default: 0.0.0.0/0
+          pattern: '^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/\d+$'
+          minLength: 9
+          maxLength: 19
+          description: (Optional) List of CIDR blocks. Cannot be specified with source_security_group_id.
+        #ipv6_cidr_blocks:
+        #  type: string
+        #  title: ipv6_cidr_blocks
+        #  description: (Optional) List of IPv6 CIDR blocks.
+        description:
+          type: string
+          title: description
+          default: egress
+          description: (Optional) Description of the rule.
+  line10:
+    type: string
+    title: ''
+    readOnly: true
+    default: '- - - - - - - - - - - - - - - - S E C R E T S  &  P G - - - - - - - - - - - - - - - -'
+  myCtEncInput:
+    comment: |
+      # example of a Cloud Template Encrypted Input
+    type: string
+    title: My CT Enc Input
+    encrypted: true
+    default: my-ct-input-encrypted-value
+    description: Cloud Template Encrypted Input
+  myIvPgInput:
+    comment: |
+      # example of a Input Values Property Group
+    type: object
+    title: My Input Values PG
+    $ref: /ref/property-groups/myIvPg
+    description: Input Values Property Group
+  line6:
+    type: string
+    title: ''
+    readOnly: true
+    default: '- - - - - - - - - - - - - - - - - - E X A M P L E S - - - - - - - - - - - - - - - - - -'
+  array:
+    type: array
+    title: Array
+    description: Example of a simple array with default input value
+    default:
+      - DefaultValue
+  arrayObjectString:
+    type: array
+    title: arrayObjectString
+    description: Array Example
+    items:
+      type: object
+      properties:
+        sgTag:
+          type: string
+          title: Security Group Tag
+  arrayObjectObjectString:
+    type: array
+    title: arrayObjectObjectString
+    description: Array Example
+    items:
+      type: object
+      properties:
+        sgTag:
+          type: object
+          title: Security Group Tag
+          properties:
+            key:
+              type: string
+              title: Key
+              description: 'Only hyphens (-), underscores (_), lowercase characters, and numbers are allowed.'
+              pattern: '^[-a-z0-9\-\_]*$'
+            value:
+              type: string
+              title: Value
+              description: 'Only hyphens (-), underscores (_), lowercase characters, and numbers are allowed.'
+              pattern: '^[-a-z0-9\-\_]*$'
+  arrayObjectObjectDataGrid:
+    type: array
+    title: Array Of Objects (Data Grid)
+    items:
+      type: object
+      properties:
+        column1:
+          type: string
+          title: DropdownSelect
+          enum:
+            - Gold
+            - Silver
+            - Bronze
+        column2:
+          type: number
+          title: MinMaxSelect
+          minimum: 80
+          maximum: 1000
+          default: 10
+        column3:
+          type: string
+          title: StringText
+#------------------------RESOURCES-----------------------#
+resources:
+  app-net2:
+    type: Cloud.Network
+    properties:
+      #-----------------CUSTOM PROPERTIES----------------#
+      #------------INHERITED CUSTOM PROPERTIES-----------#
+      #----------------NAMESPACE PROPERTIES--------------#
+      #--------------VSPHERE/NSX PROPERTIES--------------#
+      #----------------AGNOSTIC PROPERTIES---------------#
+      name: net-tito2
+      networkType: existing
+      constraints:
+        - tag: '${input.network2}'
+  app-net:
+    type: Cloud.Network
+    properties:
+      #-----------------CUSTOM PROPERTIES----------------#
+      # Using the Network Payload metadata to store some custom 
+      # properties which are referred to within the bluprint.
+      # 
+      # resourceGroupNameProp - Resoruce Group in which resoruces will be deployed
+      resourceGroupNameProp: '${input.resourceGroupType == "ondemand" && input.cloudZone == "cas.cloud.zone.type:aws" || input.resourceGroupType == "ondemand" && input.cloudZone == "cas.cloud.zone.type:gcp" || input.resourceGroupType == "ondemand" && input.cloudZone == "cas.cloud.zone.type:azure" ? "" : input.resourceGroupType == "ondemand" && input.cloudZone == "cas.cloud.zone.type:vmc" || input.resourceGroupType == "ondemand" && input.cloudZone == "cas.cloud.zone.type:vcenter" ? "Workloads/CAS Workloads" : input.resourceGroupType == "predefined" && input.cloudZone == "cas.cloud.zone.type:aws" || input.resourceGroupType == "predefined" && input.cloudZone == "cas.cloud.zone.type:gcp" ? "" : input.resourceGroupType == "predefined" && input.cloudZone == "cas.cloud.zone.type:azure" ? ("elasticsky-" + substring(input.environment, 19, -1) + "-rg") : input.resourceGroupType == "predefined" && input.cloudZone == "cas.cloud.zone.type:vmc" || input.resourceGroupType == "predefined" && input.cloudZone == "cas.cloud.zone.type:vcenter" ? "Workloads/CAS Workloads" : input.resourceGroupType == "existing" && input.cloudZone == "cas.cloud.zone.type:aws" || input.resourceGroupType == "existing" && input.cloudZone == "cas.cloud.zone.type:gcp" ? "" : input.resourceGroupType == "existing" && input.cloudZone == "cas.cloud.zone.type:azure" || input.resourceGroupType == "existing" && input.cloudZone == "cas.cloud.zone.type:vmc" || input.resourceGroupType == "existing" && input.cloudZone == "cas.cloud.zone.type:vcenter" ? input.resourceGroupName : ""}'
+      # 
+      # sshKeyProp - SSH Key that will be applied to all machine reosurces 
+      sshKeyProp: ssh-rsa AAAAB3NzaC1yc2EAAAABJQAAAQEAp7fYaIex88KRGhNWTYIwqJn/jtDp9ZV71WtBSpi9/LFhMh0f87n+W8Ms3QgA2WdEcTJRLoc3blHGo3a6TIqDGuVmGwgJjXpQA65aHjQS5P3gv86vDELuTlKev3BumcvmqpGeoyKY4zn4RLtdiWDCLI+rMEkWAPyV7RbbNzuaJoQUKTdfv1iBfWo0thoQzTj9KluTgM6FWXz7iyNB4J7NXIeYfxfbQgl3mAGdQkc11cgrnfFfjIRVA/nE5pUbOErJ9cUEMscb5iXMPQvs2zKcfZ0FYd4+TwfRpPwzYVC/vmS9kO7jrGQbtkOzTyf1GqOXCQ4URX2cPWS4zthXS5gm5Q==
+      'array[*]Prop': '${to_string(input.array)}'
+      'array[0]Prop': '${to_string(input.array[0])}'
+      'array[1]Prop': '${to_string(input.array[1])}'
+      'arrayObjectString[*]Prop': '${to_string(input.arrayObjectString)}'
+      'arrayObjectString[0]Prop': '${to_string(input.arrayObjectString[0].sgTag)}'
+      'arrayObjectString[1]Prop': '${to_string(input.arrayObjectString[1].sgTag)}'
+      'arrayObjectObjectString[*]Prop': '${to_string(input.arrayObjectObjectString)}'
+      'arrayObjectObjectString[0]Prop': '${to_string(input.arrayObjectObjectString[0].sgTag)}'
+      'arrayObjectObjectString[0]keyProp': '${to_string(input.arrayObjectObjectString[0].sgTag["key"])}'
+      'arrayObjectObjectString[0]valueProp': '${to_string(input.arrayObjectObjectString[0].sgTag["value"])}'
+      'arrayObjectObjectString[1]Prop': '${to_string(input.arrayObjectObjectString[1].sgTag)}'
+      'arrayObjectObjectString[1]keyProp': '${to_string(input.arrayObjectObjectString[1].sgTag["key"])}'
+      'arrayObjectObjectString[1]valueProp': '${to_string(input.arrayObjectObjectString[1].sgTag["value"])}'
+      'arrayObjectObjectDataGrid[*]Column1Prop': '${to_string(input.arrayObjectObjectDataGrid.column1)}'
+      'arrayObjectObjectDataGrid[*]Column2Prop': '${to_string(input.arrayObjectObjectDataGrid.column2)}'
+      'arrayObjectObjectDataGrid[*]Column3Prop': '${to_string(input.arrayObjectObjectDataGrid.column3)}'
+      'arrayObjectObjectDataGrid[0]Column1Prop': '${to_string(input.arrayObjectObjectDataGrid[0].column1)}'
+      'arrayObjectObjectDataGrid[0]Column2Prop': '${to_string(input.arrayObjectObjectDataGrid[0].column2)}'
+      'arrayObjectObjectDataGrid[0]Column3Prop': '${to_string(input.arrayObjectObjectDataGrid[0].column3)}'
+      'arrayObjectObjectDataGrid[1]Column1Prop': '${to_string(input.arrayObjectObjectDataGrid[1].column1)}'
+      'arrayObjectObjectDataGrid[1]Column2Prop': '${to_string(input.arrayObjectObjectDataGrid[1].column2)}'
+      'arrayObjectObjectDataGrid[1]Column3Prop': '${to_string(input.arrayObjectObjectDataGrid[1].column3)}'
+      # 
+      fun_matches_info: |-
+        # matches(String, regex)
+        #   - You can use online editor (ECMAScript ) https://regex101.com/r/ROewq5/1 to build regex's
+        #   :returns: boolean
+      fun_matches1: '${ to_string(matches( "my-dev"           , "(.*[-dev])"  )) }' # True
+      fun_matches2: '${ to_string(matches( env.deploymentName , "(.*[-dev])"  )) == "true" ? "Contains" : "Does NOT Contain" }'
+      fun_matches3: '${ to_string(matches( "mydev"            , "(.*[-dev])"  )) }' # False 
+      fun_matches4: '${ to_string(matches( "aZ"               , "(.*[a-z])"   )) }' # False
+      fun_matches5: '${ to_string(matches( "za"               , "(.*[az])"    )) }' # True
+      fun_matches6: '${ to_string(matches( "az"               , "(.*[a-z])"   )) }' # True  
+      fun_matches7: '${ to_string(matches( "dazd"             , "(.*[az])"    )) }' # True
+      #------------INHERITED CUSTOM PROPERTIES-----------#
+      #----------------NAMESPACE PROPERTIES--------------#
+      #--------------VSPHERE/NSX PROPERTIES--------------#
+      #networkCidr: 
+      #----------------AGNOSTIC PROPERTIES---------------#
+      name: net-tito
+      networkType: existing
+      #tags: 
+      #resourceGroupName: 
+      #description: 
+      #count: 
+      constraints:
+        - tag: '${input.network}'
+  applb:
+    type: Cloud.LoadBalancer
+    dependsOn:
+      - azureResourceGroup
+    properties:
+      #-----------------CUSTOM PROPERTIES----------------#
+      #------------INHERITED CUSTOM PROPERTIES-----------#
+      #----------------NAMESPACE PROPERTIES--------------#
+      #------------------NSX PROPERTIES------------------#
+      #type: 
+      #loggingLevel: 
+      #----------------AGNOSTIC PROPERTIES---------------#
+      #constraints: 
+      #address: 
+      name: lb-tito-web
+      # count: Do not deploy LB if cloud account is VMC or vSphere. VMC Does not support a LB dpeloyment. 
+      count: '${input.loadLabancer == 1 && input.cloudZone == "cas.cloud.zone.type:vmc" || input.loadLabancer == 1 && input.cloudZone == "cas.cloud.zone.type:vcenter" || input.loadLabancer == 0 ? 0 : 1 }'
+      resourceGroupName: '${resource["app-net"].resourceGroupNameProp}'
+      tags: '${input.tagsOptional + input.tagsRequired}'
+      routes:
+        - protocol: HTTP
+          port: '80'
+          instanceProtocol: HTTP
+          instancePort: '80'
+      network: '${resource["app-net"].name}'
+      instances: '${resource["web-tier"][*].id}'
+      internetFacing: true
+  web-tier:
+    type: Cloud.Machine
+    dependsOn:
+      - db-tier
+      - azureResourceGroup
+    # Ref: https://docs.vmware.com/en/VMware-Cloud-Assembly/services/Using-and-Managing/GUID-B76918AE-D18D-4821-B160-F0CFAE173359.html
+    #recreatePropertiesOnUpdate: Users of a resource might reconfigure properties, changing the resource from its deployed state. During an update, a resource might or might not be recreated. Resources that aren't recreated might remain with properties in changed states. If you want a resource and its properties to be recreated, independent of whether the update would have done so by default, set this flag to true.
+    #preventDelete: If you need to protect a resource from subsequent delete requests, set this flag to true.
+    #ignorePropertiesOnUpdate: Users of a resource might customize certain properties, and those properties might be reset to their original cloud template state during an update action. To prevent any properties from being reset by an update action, set this flag to true.
+    #ignoreChanges: Users of a resource might reconfigure it, changing the resource from its deployed state. If you want to perform a deployment update but not overwrite the changed resource with the configuration from the cloud template, set this flag to true.
+    #forceRecreate: Not all update actions require that the existing resource be removed and a new one be created. If you want an update to remove the old resource and create a new one, independent of whether the update would have done so by default, set this flag to true. 
+    #dependsOnPreviousInstances: When set to true, create cluster resources sequentially. The default is false, which simultaneously creates all resources in a cluster. For example, sequential creation is useful for database clusters where primary and secondary nodes must be created, but secondary node creation needs configuration settings that connect the node to an existing, primary node.
+    #dependsOn: This flag identifies an explicit dependency between resources, where one resource must exist before creating the next one. 
+    #updateTimeout: The Cloud Assembly default timeout for update requests is 2 hours (2h). In addition, a project administrator can set a different default timeout for update requests, applicable throughout the project. This flag lets you override any defaults and set the individual timeout for a specific resource update operation. See also deleteTimeout and createTimeout.
+    #deleteTimeout: The Cloud Assembly default timeout for update requests is 2 hours (2h). In addition, a project administrator can set a different default timeout for update requests, applicable throughout the project. This flag lets you override any defaults and set the individual timeout for a specific resource update operation. See also deleteTimeout and createTimeout.
+    #createTimeout: The Cloud Assembly default timeout for update requests is 2 hours (2h). In addition, a project administrator can set a different default timeout for update requests, applicable throughout the project. This flag lets you override any defaults and set the individual timeout for a specific resource update operation. See also deleteTimeout and createTimeout.
+    #createBeforeDelete: Some update actions require that the existing resource be removed and a new one be created. By default, removal is first, which can lead to conditions where the old resource is gone but the new one wasn't created successfully for some reason. Set this flag to true if you need to make sure that the new resource is successfully created before deleting the previous one
+    #allocatePerInstance: When set to true, resource allocation can be customized for each machine in a cluster. The default is false, which allocates resources equally across the cluster, resulting in the same configuration for each machine. In addition, day 2 actions might not be separately possible for individual resources. Per instance allocation allows count.index to correctly apply the configuration for individual machines. 
+    allocatePerInstance: true
+    properties:
+      #-----------------CUSTOM PROPERTIES----------------#
+      #
+      # --- ABX casRunScript --- #
+      # Command to execute
+      abxRunScript_script: mkdir bp-dir
+      # TIme delay in seconds before the script is run 
+      abxRunScript_delay: 120
+      # Type of the script: shell (Linux) or powershell (Windows)
+      abxRunScript_shellType: linux
+      # Specifies in which Cloud Account the deployment is running: azure, aws, ect..
+      # Used for Subscription Condition Filtering 
+      abxRunScript_endpointType: '${self.endpointType}'
+      # --- ABX casGetSecrets --- #
+      myCvPgSecretProp: '${propgroup.myCvPg.myPgSecret}'
+      myIvPgEncConstProp: '${input.myIvPgInput.myPgEncConst}'
+      mySecretProp: '${secret.mySecret}'
+      myCtEncInputProp: '${input.myCtEncInput}'
+      #------------INHERITED CUSTOM PROPERTIES-----------#
+      #----------------NAMESPACE PROPERTIES--------------#
+      selfZoneProp: '${self.zone}'
+      selfRegionProp: '${self.region}'
+      selfStorageProp: '${self.storage}'
+      selfProviderIdProp: '${self.providerId}'
+      selfProjectProp: '${self.project}'
+      selfPowerStateProp: '${self.powerState}'
+      selfOSTypeProp: '${self.osType}'
+      selfNetworksProp: '${self.networks}'
+      selfNameProp: '${self.name}'
+      selfImageRefProp: '${self.imageRef}'
+      selfImageProp: '${self.image}'
+      selfIgnoreActiveDirectory: '${self.ignoreActiveDirectory}'
+      selfFlavorProp: '${self.flavor}'
+      selfExternalLinkProp: '${self.externalLink}'
+      selfEndpointTypeProp: '${self.endpointType}'
+      selfConstraintsProp: '${self.constraints}'
+      selfCountProp: '${self.count}'
+      selfcloudConfigSettingsProp: '${self.cloudConfigSettings}'
+      selfCloudConfigProp: '${self.cloudConfig}'
+      selfAutoScaleConfigurationProp: '${self.autoScaleConfiguration}'
+      selfAttachedDisksProp: '${self.attachedDisks}'
+      selfAddressProp: '${self.address}'
+      selfActiveDirectory: '${self.activeDirectory}'
+      selfAccountProp: '${self.account}'
+      envRequestedByProp: '${env.requestedBy}'
+      envRequestedAtProp: '${env.requestedAt}'
+      #envRequestIdProp: '${env.requestId}'
+      envProjectNameProp: '${env.projectName}'
+      envProjectIdProp: '${env.projectId}'
+      envOrgIdProp: '${env.orgId}'
+      envDeploymentNameProp: '${env.deploymentName}'
+      envDeploymentIdProp: '${env.deploymentId}'
+      envBlueprintVersionProp: '${env.blueprintVersion}'
+      envBlueprintNameProp: '${env.blueprintName}'
+      envBlueprintIdProp: '${env.blueprintId}'
+      #-----------------VSPHERE PROPERTIES---------------#
+      # customizationSpec: Exmaple of how to parse multivalue input and get a given value 
+      #customizationSpec: '${split(input.image,",")[1]}'
+      #totalMemoryMB: 
+      #snapshotLimit: 
+      #retryCount: 
+      #resourceLeaseDurationSec: 
+      #ovfProperties: 
+      #folderName: 
+      #cpuCount: 
+      #coreCount: 
+      #cloneStrategy:
+      #checkImageSSLCertificate: 
+      #customizeGuestOs: (Boolean | hidden) 
+      #-------------------AWS PROPERTIES-----------------#
+      #spotDurationInHrs: 
+      #machineType: 
+      #iamInstanceProfileName: 
+      #dedicatedInstance: 
+      #------------------AZURE PROPERTIES----------------#
+      #extensions: 
+      #availabilitySetName: 
+      #doNotAttachAvailabilitySet:  
+      #----------------AGNOSTIC PROPERTIES---------------#
+      #imageRef: 
+      #count: 
+      #cloudConfigSettings: 
+      #autoScaleConfiguration: 
+      #awaitip: (Boolean | hidden) - If  subnet is not configured for DHCP and the machine may wait for IP address. The default timeout is 20m before deployment reports completed. 
+      name: vm-tito-web
+      flavor: '${length(input.webFlavor) == 0 ? "Micro" : input.webFlavor[count.index].flavor}'
+      # image: Exmaple of how to parse multivalue input and get a given value 
+      image: '${split(input.image,",")[0]}'
+      resourceGroupName: '${resource["app-net"].resourceGroupNameProp}'
+      tags: '${input.tagsOptional + input.tagsRequired}'
+      constraints:
+        - tag: '${input.cloudZone}'
+        - tag: '${input.environment}'
+        - tag: '${input.webSplit == true ? (length(input.webSplitLocations) == 0 ? (count.index % 2 == 0 ? input.compute : "!"+input.compute) : (count.index % 2 == 0 ? input.webSplitLocations[0].location : input.webSplitLocations[1].location)) : input.compute}' # This splits/load-balances the VM tier between cloud zones
+        - tag: '${input.cloudAccountOwner}'
+        - tag: '${input.drCloudAccount}'
+      networks: '${[true==true?{"network":app-net.id,"assignment":input.ipAssignment}:null] + [input.webOndemandNet==true?{"network":app-net2.id,"assignment":input.ipAssignment2}:null] }'
+      storage:
+        disks:
+          - capacityGb: 4
+        constraints:
+          - tag: '${input.storageTier}'
+      remoteAccess:
+        authentication: '${inremoteAcessAuth}'
+        sshKey: '${input.remoteAcessAuth == "publicPrivateKey" ? input.remoteAcessKey : null }'
+        keyPair: '${input.remoteAcessAuth == "keyPairName" ? input.remoteAcessKeyPairName :  null}'
+        username: '${input.remoteAcessAuth == "usernamePassword" ? input.remoteAcessUsername :  null}'
+        password: '${input.remoteAcessAuth == "usernamePassword" ? input.remoteAcessPassword :  null}'
+      cloudConfig: |
+        #cloud-config
+        repo_update: true
+        repo_upgrade: all
+        packages:
+          - git
+        runcmd:
+          - sudo -s
+            #----------------------- Enable SSH -----------------------#
+          - sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/g' /etc/ssh/sshd_config
+          - systemctl restart  sshd.service
+            #---------------------- Install Tito ----------------------#
+          - cd /tmp
+          - git clone http://${input.cloudZone == "cas.cloud.zone.type:vmc" ? "gitlab.livefire.lab" : "gitlab.elasticskyholdings.com" }/class-delivery/tito.git
+          - cd tito/asset/Deployment/CloudAssembly/titodb/
+          - chmod u+x *.sh
+          - bash tito_as.sh ${resource["db-tier"].address}
+            #----------------- Instal SaltStack Minion ----------------#
+          - if [ ${input.sseMinionInstall} == "Yes" ]; 
+          - then 
+          -    cd /tmp
+          -    #------------------- Install Minion --------------------#
+          -    curl -L 'https://gitlab.com/skaloferov/saltstack/-/raw/master/setup-scripts/salt-minion-setup-vmw-assembly-centos-bs-gr.sh' -o salt-minion-setup-vmw-assembly-centos-bs-gr.sh ; 
+          -    chmod u+x *.sh
+          -    bash salt-minion-setup-vmw-assembly-centos-bs-gr.sh
+          -    #------------------ Add Custom Grains ------------------#
+          -    cd /tmp 
+          -    grainsList="requested_by:${env.requestedBy},project_name:${env.projectName},region:${self.region},image:${self.image},flavor:${self.flavor},account:${self.account}"
+          -    grainsCons="${self.constraints}"
+          -    grainsTags="${self.tags}"
+          -    grainsArray="${input.sseMinionGrains}"
+          -    curl -L 'https://gitlab.com/skaloferov/saltstack/-/raw/master/salt-minion/grains/salt-minion-vmw-assembly-ct-add-grains.sh' -o salt-minion-vmw-assembly-ct-add-grains.sh ; 
+          -    chmod u+x *.sh
+          -    bash salt-minion-vmw-assembly-ct-add-grains.sh -c $grainsCons -t $grainsTags -a $grainsArray -l $grainsList
+          - fi
+            #----------------------- Install Zsh ----------------------#
+          - cd /tmp
+          - curl -L 'https://gitlab.com/skaloferov/linux/-/raw/master/apps/oh-my-zsh/setup-scripts/zsh-setup-centos-ci.sh' -o zsh-setup-centos-ci.sh
+          - chmod u+x *.sh
+          - bash zsh-setup-centos-ci.sh
+      attachedDisks: '${map_to_object(slice(resource.volumes-web[*].id,input.volumesWebCount * count.index,input.volumesWebCount * (count.index +1)),"source")}'
+      # below is also supposed to work but due to bug that does not allow functions like lenght() ot be used in the attached Disks property , it does not. 
+      #attachedDisks: '${map_to_object(slice(resource.volumes-web[*].id,length(input.volumes-web) *count.index,length(input.volumes-web)*(count.index +1)),"source")}'
+      #- source: '${resource.volumes-web[*][count.index].id}'
+      count: '${input.webCount}'
+  db-tier:
+    type: Cloud.Machine
+    # Ref: https://docs.vmware.com/en/VMware-Cloud-Assembly/services/Using-and-Managing/GUID-B76918AE-D18D-4821-B160-F0CFAE173359.html
+    #recreatePropertiesOnUpdate: Users of a resource might reconfigure properties, changing the resource from its deployed state. During an update, a resource might or might not be recreated. Resources that aren't recreated might remain with properties in changed states. If you want a resource and its properties to be recreated, independent of whether the update would have done so by default, set this flag to true.
+    #preventDelete: If you need to protect a resource from subsequent delete requests, set this flag to true.
+    #ignorePropertiesOnUpdate: Users of a resource might customize certain properties, and those properties might be reset to their original cloud template state during an update action. To prevent any properties from being reset by an update action, set this flag to true.
+    #ignoreChanges: Users of a resource might reconfigure it, changing the resource from its deployed state. If you want to perform a deployment update but not overwrite the changed resource with the configuration from the cloud template, set this flag to true.
+    #forceRecreate: Not all update actions require that the existing resource be removed and a new one be created. If you want an update to remove the old resource and create a new one, independent of whether the update would have done so by default, set this flag to true. 
+    #dependsOnPreviousInstances: When set to true, create cluster resources sequentially. The default is false, which simultaneously creates all resources in a cluster. For example, sequential creation is useful for database clusters where primary and secondary nodes must be created, but secondary node creation needs configuration settings that connect the node to an existing, primary node.
+    #dependsOn: This flag identifies an explicit dependency between resources, where one resource must exist before creating the next one. 
+    #updateTimeout: The Cloud Assembly default timeout for update requests is 2 hours (2h). In addition, a project administrator can set a different default timeout for update requests, applicable throughout the project. This flag lets you override any defaults and set the individual timeout for a specific resource update operation. See also deleteTimeout and createTimeout.
+    #deleteTimeout: The Cloud Assembly default timeout for update requests is 2 hours (2h). In addition, a project administrator can set a different default timeout for update requests, applicable throughout the project. This flag lets you override any defaults and set the individual timeout for a specific resource update operation. See also deleteTimeout and createTimeout.
+    #createTimeout: The Cloud Assembly default timeout for update requests is 2 hours (2h). In addition, a project administrator can set a different default timeout for update requests, applicable throughout the project. This flag lets you override any defaults and set the individual timeout for a specific resource update operation. See also deleteTimeout and createTimeout.
+    #createBeforeDelete: Some update actions require that the existing resource be removed and a new one be created. By default, removal is first, which can lead to conditions where the old resource is gone but the new one wasn't created successfully for some reason. Set this flag to true if you need to make sure that the new resource is successfully created before deleting the previous one
+    #allocatePerInstance: When set to true, resource allocation can be customized for each machine in a cluster. The default is false, which allocates resources equally across the cluster, resulting in the same configuration for each machine. In addition, day 2 actions might not be separately possible for individual resources. Per instance allocation allows count.index to correctly apply the configuration for individual machines. 
+    dependsOn:
+      - azureResourceGroup
+    properties:
+      #-----------------CUSTOM PROPERTIES----------------#
+      #
+      # --- ABX casRunScript --- #
+      # Command to execute
+      abxRunScript_script: mkdir bp-dir
+      # TIme delay in seconds before the script is run 
+      abxRunScript_delay: 120
+      # Type of the script: shell (Linux) or powershell (Windows)
+      abxRunScript_shellType: linux
+      # Specifies in which Cloud Account the deployment is running: azure, aws, ect..
+      # Used for Subscription Condition Filtering 
+      abxRunScript_endpointType: '${self.endpointType}'
+      # --- ABX casGetSecrets --- #
+      myCvPgSecretProp: '${propgroup.myCvPg.myPgSecret}'
+      myIvPgEncConstProp: '${input.myIvPgInput.myPgEncConst}'
+      mySecretProp: '${secret.mySecret}'
+      myCtEncInputProp: '${input.myCtEncInput}'
+      #------------INHERITED CUSTOM PROPERTIES-----------#
+      #----------------NAMESPACE PROPERTIES--------------#
+      selfZoneProp: '${self.zone}'
+      selfRegionProp: '${self.region}'
+      selfTag: '${self.tags}'
+      selfTagStr: '${to_string(self.tags)}'
+      selfStorageProp: '${self.storage}'
+      selfProviderIdProp: '${self.providerId}'
+      selfProjectProp: '${self.project}'
+      selfPowerStateProp: '${self.powerState}'
+      selfOSTypeProp: '${self.osType}'
+      selfNetworksProp: '${self.networks}'
+      selfNameProp: '${self.name}'
+      selfImageRefProp: '${self.imageRef}'
+      selfImageProp: '${self.image}'
+      selfIgnoreActiveDirectory: '${self.ignoreActiveDirectory}'
+      selfFlavorProp: '${self.flavor}'
+      selfExternalLinkProp: '${self.externalLink}'
+      selfEndpointTypeProp: '${self.endpointType}'
+      selfConstraintsProp: '${self.constraints}'
+      selfCon: '${self.constraints}'
+      selfConStr: '${to_string(self.constraints)}'
+      selfCountProp: '${self.count}'
+      selfcloudConfigSettingsProp: '${self.cloudConfigSettings}'
+      selfCloudConfigProp: '${self.cloudConfig}'
+      selfAutoScaleConfigurationProp: '${self.autoScaleConfiguration}'
+      selfAttachedDisksProp: '${self.attachedDisks}'
+      selfAddressProp: '${self.address}'
+      selfActiveDirectory: '${self.activeDirectory}'
+      selfAccountProp: '${self.account}'
+      envRequestedByProp: '${env.requestedBy}'
+      envRequestedAtProp: '${env.requestedAt}'
+      #envRequestIdProp: '${env.requestId}'
+      envProjectNameProp: '${env.projectName}'
+      envProjectIdProp: '${env.projectId}'
+      envOrgIdProp: '${env.orgId}'
+      envDeploymentNameProp: '${env.deploymentName}'
+      envDeploymentIdProp: '${env.deploymentId}'
+      envBlueprintVersionProp: '${env.blueprintVersion}'
+      envBlueprintNameProp: '${env.blueprintName}'
+      envBlueprintIdProp: '${env.blueprintId}'
+      #-----------------VSPHERE PROPERTIES---------------#
+      # customizationSpec: Exmaple of how to parse multivalue input and get a given value 
+      #customizationSpec: '${split(input.image,",")[1]}'
+      #totalMemoryMB: 
+      #snapshotLimit: 
+      #retryCount: 
+      #resourceLeaseDurationSec: 
+      #ovfProperties: 
+      #folderName: 
+      #cpuCount: 
+      #coreCount: 
+      #cloneStrategy:
+      #checkImageSSLCertificate: 
+      #customizeGuestOs: (Boolean | hidden) 
+      #-------------------AWS PROPERTIES-----------------#
+      #spotDurationInHrs: 
+      #machineType: 
+      #iamInstanceProfileName: 
+      #dedicatedInstance: 
+      #------------------AZURE PROPERTIES----------------#
+      #extensions: 
+      #availabilitySetName: 
+      #doNotAttachAvailabilitySet:  
+      #----------------AGNOSTIC PROPERTIES---------------#
+      #imageRef: 
+      #count: 
+      #cloudConfigSettings: 
+      #autoScaleConfiguration: 
+      #awaitip: (Boolean | hidden) - If  subnet is not configured for DHCP and the machine may wait for IP address. The default timeout is 20m before deployment reports completed. 
+      name: vm-tito-db
+      flavor: '${input.flavour}'
+      # image: Exmaple of how to parse multivalue input and get a given value 
+      image: '${split(input.image,",")[0]}'
+      resourceGroupName: '${resource["app-net"].resourceGroupNameProp}'
+      tags: '${input.tagsOptional + input.tagsRequired}'
+      constraints:
+        - tag: '${input.cloudZone}'
+        - tag: '${input.environment}'
+        - tag: '${input.compute}'
+        - tag: '${input.cloudAccountOwner}'
+        - tag: '${input.drCloudAccount}'
+      storage:
+        disks:
+          - capacityGb: 4
+        constraints:
+          - tag: '${input.storageTier}'
+      networks:
+        - network: '${resource["app-net"].id}'
+          assignment: '${input.ipAssignment}'
+      remoteAccess:
+        authentication: '${inremoteAcessAuth}'
+        sshKey: '${input.remoteAcessAuth == "publicPrivateKey" ? input.remoteAcessKey : null }'
+        keyPair: '${input.remoteAcessAuth == "keyPairName" ? input.remoteAcessKeyPairName :  null}'
+        username: '${input.remoteAcessAuth == "usernamePassword" ? input.remoteAcessUsername :  null}'
+        password: '${input.remoteAcessAuth == "usernamePassword" ? input.remoteAcessPassword :  null}'
+      cloudConfig: |
+        #cloud-config 
+        repo_update: true
+        repo_upgrade: all
+        packages:
+          - git
+          - mariadb-server
+        runcmd:
+          - sudo -s
+            #----------------------- Enable SSH -----------------------#
+          - sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/g' /etc/ssh/sshd_config
+          - systemctl restart  sshd.service
+            #---------------------- Install Tito ----------------------#
+          - cd /tmp
+          - git clone http://${input.cloudZone == "cas.cloud.zone.type:vmc" ? "gitlab.livefire.lab" : "gitlab.elasticskyholdings.com" }/class-delivery/tito.git
+          - cd tito/asset/Deployment/CloudAssembly/titodb/
+          - chmod u+x *.sh
+            #----------------- Instal SaltStack Minion ----------------#
+          - if [ ${input.sseMinionInstall} == "Yes" ]; 
+          - then 
+          -    cd /tmp
+          -    #------------------- Install Minion --------------------#
+          -    curl -L 'https://gitlab.com/skaloferov/saltstack/-/raw/master/setup-scripts/salt-minion-setup-vmw-assembly-centos-bs-gr.sh' -o salt-minion-setup-vmw-assembly-centos-bs-gr.sh ; 
+          -    chmod u+x *.sh
+          -    bash salt-minion-setup-vmw-assembly-centos-bs-gr.sh
+          -    #------------------ Add Custom Grains ------------------#
+          -    cd /tmp 
+          -    grainsList="requested_by:${env.requestedBy},project_name:${env.projectName},region:${self.region},image:${self.image},flavor:${self.flavor},account:${self.account}"
+          -    grainsCons="${self.constraints}"
+          -    grainsTags="${self.tags}"
+          -    grainsArray="${input.sseMinionGrains}"
+          -    curl -L 'https://gitlab.com/skaloferov/saltstack/-/raw/master/salt-minion/grains/salt-minion-vmw-assembly-ct-add-grains.sh' -o salt-minion-vmw-assembly-ct-add-grains.sh ; 
+          -    chmod u+x *.sh
+          -    bash salt-minion-vmw-assembly-ct-add-grains.sh -c $grainsCons -t $grainsTags -a $grainsArray -l $grainsList
+          - fi
+            #----------------------- Install Zsh ----------------------#
+          - cd /tmp
+          - curl -L 'https://gitlab.com/skaloferov/linux/-/raw/master/apps/oh-my-zsh/setup-scripts/zsh-setup-centos-ci.sh' -o zsh-setup-centos-ci.sh
+          - chmod u+x *.sh
+          - bash zsh-setup-centos-ci.sh
+      attachedDisks: '${map_to_object(resource.volumes-db[*].id, "source")}'
+  create-aws-sg:
+    type: Cloud.Terraform.Configuration
+    dependsOn:
+      - db-tier
+      - web-tier
+    comment: |
+      # Example of a Terraform configuraiton that creates an 
+      # AWS Security Group and attaches it to the instnace(s)
+      # TF files can be found in the Gitlab link provided
+    properties:
+      count: '${input.awsSgCreateCount}'
+      variables:
+        # awsSgName: Supplies a name for the SG. Format is: userName-deploymentId
+        awsSgName: '${(split(env.requestedBy,"@")[0])+"-"+env.deploymentId}'
+        # awsSgTagOwner: Adds the deployment requestor as Tag value to the SG      
+        awsSgTagOwner: '${(split(env.requestedBy,"@")[0])}'
+        # awsProviderRegion: Gets the Provider Region of the machine resources
+        awsProviderRegion: '${resource["db-tier"].region}'
+        # awsProviderRegion: Gets the VPC ID of the machine resources
+        awsVpcId: '${resource["db-tier"].awsVpcId}'
+        # awsInstanceId1/2/3: Uncomment variables properties awsInstanceId1/2/3 to attach more instances if needed. 
+        awsInstanceId1: '${to_string(resource["db-tier"].providerId)}'
+        awsInstanceId2: '${to_string(resource["web-tier"].providerId)}'
+        #awsInstanceId3: ''
+        # awsSgIngressRules: Adds the Ingress Rules from Inputs
+        awsSgIngressRules: '${to_string(input.awsSgIngressRules)}'
+        # awsSgEgressRules: Adds the Egress Rules from Inputs
+        awsSgEgressRules: '${to_string(input.awsSgEgressRules)}'
+      providers:
+        - name: aws
+          cloudZone: '${resource["db-tier"].account+"/"+resource["db-tier"].region}'
+      terraformVersion: 0.12.29
+      configurationSource:
+        repositoryId: faf819e0-6dfb-490f-ac09-0506efe8e177
+        commitId: 6da592940db43e7d6226143b810de12e3d498630
+        sourceDirectory: aws-ec2-create-security-group-and-attach-to-instance
+  volumes-web:
+    type: Cloud.Volume
+    dependsOn:
+      - azureResourceGroup
+    comment: |
+      # Example how we can add multiple volumes at request 
+      # time and also specify different properties for each
+      # one of them, for a MULTI INSTANCE machine resource. 
+    # allocatePerInstance - Needs to be set to TRUE for the [count.index] loop to wor or for multi-instance resources
+    allocatePerInstance: true
+    properties:
+      #-----------------CUSTOM PROPERTIES----------------#
+      # volumePropertiesProp - Contains all properties of the resource
+      volumePropertiesProp: '${to_string(input.volumes-web[count.index])}'
+      #------------INHERITED CUSTOM PROPERTIES-----------#
+      #----------------NAMESPACE PROPERTIES--------------#
+      #-----------------VSPHERE PROPERTIES---------------#
+      #account: 
+      # dataStore: This requires that there are no Storage Profiles configured for the given Cloud Zone.
+      #providerId:
+      #provisioningType:
+      #region: 
+      #storagePolicy: This requires that there are no Storage Profiles configured for the given Cloud Zone.
+      #-------------------AWS PROPERTIES-----------------#
+      #volumeType: 
+      #iops: 
+      #------------------AZURE PROPERTIES----------------#
+      #storageAccountName: 
+      #managedDiskType: 
+      #diskCaching: 
+      #----------------AGNOSTIC PROPERTIES---------------#
+      #persistent: 
+      #maxDiskCapacityInGB: 
+      #encrypted: 
+      # name - default to a predefined name prefix if such is not specified
+      name: '${input.volumesWebSameSpecs == true     ?     ("vol-web-" + (count.index < length(input.volumes-web) ? (input.volumes-web[count.index]).name : (input.volumes-web[(count.index % length(input.volumes-web))]).name))     :     ("vol-web-" + input.volumes-web[count.index].name) }'
+      # tags - Combines required and optional tags in one. Example of combining two arrays into one. 
+      tags: '${input.tagsOptional + input.tagsRequired}'
+      # resourceGroupName - Sets RG Name. Example of using inherited Custom Property
+      resourceGroupName: '${resource["app-net"].resourceGroupNameProp}'
+      capacityGb: '${input.volumesWebSameSpecs == true     ?     (count.index < length(input.volumes-web) ? (input.volumes-web[count.index]).capacity : (input.volumes-web[(count.index % length(input.volumes-web))]).capacity)     :     input.volumes-web[count.index].capacity}'
+      constraints:
+        - tag: '${input.volumesWebSameSpecs == true     ?     (count.index < length(input.volumes-web) ? (input.volumes-web[count.index]).storageTier : (input.volumes-web[(count.index % length(input.volumes-web))]).storageTier)     :     input.volumes-web[count.index].storageTier}'
+      count: '${input.volumesWebSameSpecs == true     ?     (length(input.volumes-web) * input.webCount)     :     (input.volumesWebCount * input.webCount)}'
+  #   count: '${length(input.volumes-web)}'
+  volumes-db:
+    type: Cloud.Volume
+    dependsOn:
+      - azureResourceGroup
+    comment: |
+      # Example how we can add multiple volumes at request 
+      # time and also specify different properties for each
+      # one of them, for a SINGLE INSTANCE machine resource. 
+    # allocatePerInstance - Needs to be set to TRUE for the [count.index] loop to wor or for multi-instance resources
+    allocatePerInstance: true
+    properties:
+      #-----------------CUSTOM PROPERTIES----------------#
+      # volumePropertiesProp - Contains all properties of the resource
+      volumePropertiesProp: '${to_string(input.volumes-db[count.index])}'
+      #------------INHERITED CUSTOM PROPERTIES-----------#
+      #----------------NAMESPACE PROPERTIES--------------#
+      #-----------------VSPHERE PROPERTIES---------------#
+      #account: 
+      # dataStore: This requires that there are no Storage Profiles configured for the given Cloud Zone.
+      #providerId:
+      #provisioningType:
+      #region: 
+      #storagePolicy: This requires that there are no Storage Profiles configured for the given Cloud Zone.
+      #-------------------AWS PROPERTIES-----------------#
+      #volumeType: 
+      #iops: 
+      #------------------AZURE PROPERTIES----------------#
+      #storageAccountName: 
+      #managedDiskType: 
+      #diskCaching: 
+      #----------------AGNOSTIC PROPERTIES---------------#
+      #persistent: 
+      #maxDiskCapacityInGB: 
+      #encrypted: 
+      # name - default to a predefined name prefix if such is not specified
+      name: '${"vol-db" + (input.volumes-db[count.index].name != null ? "-" + input.volumes-db[count.index].name : "")}'
+      # tags - Combines required and optional tags in one. Example of combining two arrays into one. 
+      tags: '${input.tagsOptional + input.tagsRequired}'
+      # resourceGroupName - Sets RG Name. Example of using inherited Custom Property
+      resourceGroupName: '${resource["app-net"].resourceGroupNameProp}'
+      capacityGb: '${input.volumes-db[count.index].capacity}'
+      constraints:
+        - tag: '${input.volumes-db[count.index].storageTier}'
+      count: '${length(input.volumes-db)}'
+  azureResourceGroup:
+    type: Cloud.Azure.ResourceGroup
+    comment: |
+      # Creates NEW Azure RG with a given name IF specified inputs
+    properties:
+      # count - Creates RG only if given input/type is specified 
+      count: '${input.resourceGroupType == "createcustom" && input.cloudZone == "cas.cloud.zone.type:azure"? 1 : 0 }'
+      useExisting: false
+      name: '${input.resourceGroupName}'

@@ -1,0 +1,192 @@
+#--------------------------------------------------------#
+#                     Spas Kaloferov                     #
+#                   www.kaloferov.com                    #
+# bit.ly/The-Twitter      Social     bit.ly/The-LinkedIn #
+# bit.ly/The-Gitlab        Git         bit.ly/The-Github #
+# bit.ly/The-BSD         License          bit.ly/The-GNU #
+#--------------------------------------------------------#
+info: |
+  #
+  #       VMware Cloud Assembly Blueprint Code Sample          
+  # 
+  # [Info]
+  #  - Deploys Tito Multi-Tier app with LB
+  #
+name: Tito - Multi-Tier with LB
+version: 1.0 
+#-------------------------INPUTS-------------------------#
+inputs:
+  image:
+    type: string
+    description: Select image
+    default: centos-74-livefire-image
+    title: Image
+    oneOf:
+      - title: CentOS 7.4
+        const: centos-74-image
+      - title: CentOS 7.4 (Livefire)
+        const: centos-74-livefire-image
+  flavour:
+    type: string
+    enum:
+      - micro
+      - small
+      - medium
+      - large
+    description: |-
+      Select the size of the deployment.
+      Micro = 1 CPU - 1 GB RAM, 
+      Small =  1 CPU - 2 GB RAM, 
+      Medium = 2 CPU - 4 GB RAM, 
+      Large = 2 CPU - 8 GB RAM
+    default: micro
+  environment:
+    type: string
+    description: 'Select the development, testing, or production environment .'
+    default: 'cas.cloud.zone.env:dev'
+    title: Environment
+    oneOf:
+      - title: '* ANY *'
+        const: ''
+      - title: Development
+        const: 'cas.cloud.zone.env:dev'
+      - title: Test
+        const: 'cas.cloud.zone.env:test'
+      - title: Prodiction
+        const: 'cas.cloud.zone.env:prod'
+  cloudZone:
+    type: string
+    description: Select Public CLoud.
+    default: 'cas.cloud.zone.type:aws'
+    title: Cloud
+    oneOf:
+      - title: AWS
+        const: 'cas.cloud.zone.type:aws'
+      - title: Azure
+        const: 'cas.cloud.zone.type:azure'
+  count:
+    type: integer
+    default: 1
+    maximum: 5
+    minimum: 1
+    title: Cluster Size
+    description: Cluster Size (Number of nodes)
+  databaseDiskSize:
+    type: number
+    default: 4
+    maximum: 10
+    title: MySQL Data Disk Size
+    description: Size of database disk
+  archiveDiskSize:
+    type: number
+    default: 4
+    maximum: 10
+    title: Archive Disk Size
+    description: Size of  archive disk
+#-------------------------RESOURCES-------------------------#
+resources:
+  app-public-net:
+    type: Cloud.Network
+    properties:
+      tags:
+        - value: class-delivery
+          key: cas-resource-desc
+      name: net-tito-web
+      networkType: existing
+      constraints: null
+  db-tier:
+    type: Cloud.Machine
+    properties:
+      # resourceGroupName: '${"elasticsky-" + substring(input.environment, 19, -1) + "-rg"}'
+      tags:
+        - value: class-delivery
+          key: cas-resource-desc
+      constraints:
+        - tag: '${input.cloudZone}'
+        - tag: '${input.environment}'
+      name: vm-tito-db
+      flavor: '${input.flavour}'
+      image: '${input.image}'
+      storage:
+        disks:
+          - capacityGb: '${input.databaseDiskSize}'
+        constraints:
+          - tag: 'cas.storage.profile.tier:silver'
+      networks:
+        - name: '${resource["app-public-net"].name}'
+          network: '${resource["app-public-net"].id}'
+      remoteAccess:
+        authentication: publicPrivateKey
+        sshKey: www.kaloferov.com
+      cloudConfig: |
+        #cloud-config 
+        repo_update: true 
+        repo_upgrade: all 
+        packages:
+          - git
+          - mariadb-server
+        runcmd:  
+          - sudo -s
+          - cd /tmp
+          - git clone http://gitlab.elasticskyholdings.com/class-delivery/tito.git
+          - cd tito/asset/Deployment/CloudAssembly/titodb/
+          - chmod u+x *.sh
+          - bash tito_db.sh
+  web-tier:
+    type: Cloud.Machine
+    dependsOn:
+      - db-tier
+    properties:
+      # resourceGroupName: '${"elasticsky-" + substring(input.environment, 19, -1) + "-rg"}'
+      tags:
+        - value: class-delivery
+          key: cas-resource-desc
+      constraints:
+        - tag: '${input.cloudZone}'
+        - tag: '${input.environment}'
+      name: vm-tito-web
+      flavor: '${input.flavour}'
+      image: '${input.image}'
+      count: '${input.count}'
+      networks:
+        - name: '${resource["app-public-net"].name}'
+          network: '${resource["app-public-net"].id}'
+      storage:
+        disks:
+          - capacityGb: '${input.archiveDiskSize}'
+        constraints:
+          - tag: 'cas.storage.profile.tier:silver'
+      remoteAccess:
+        authentication: publicPrivateKey
+        sshKey: www.kaloferov.com
+      cloudConfig: |
+        #cloud-config
+        repo_update: true
+        repo_upgrade: all
+        packages:
+         - git
+        runcmd:
+          - sudo -s
+          - cd /tmp
+          - git clone http://gitlab.elasticskyholdings.com/class-delivery/tito.git
+          - cd tito/asset/Deployment/CloudAssembly/titodb/
+          - chmod u+x *.sh
+          - bash tito_as.sh ${resource["db-tier"].address}
+  app-lb:
+    type: Cloud.LoadBalancer
+    properties:
+      # resourceGroupName: '${"elasticsky-" + substring(input.environment, 19, -1) + "-rg"}'
+      tags:
+        - value: class-delivery
+          key: cas-resource-desc
+      name: lb-tito-web
+      routes:
+        - protocol: HTTP
+          port: '80'
+          instanceProtocol: HTTP
+          instancePort: '80'
+      network: '${resource["app-public-net"].name}'
+      instances:
+        - '${resource["web-tier"].id}'
+      internetFacing: true 
+      

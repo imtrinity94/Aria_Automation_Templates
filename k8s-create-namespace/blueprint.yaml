@@ -1,0 +1,40 @@
+#--------------------------------------------------------#
+#                     Spas Kaloferov                     #
+#                   www.kaloferov.com                    #
+# bit.ly/The-Twitter      Social     bit.ly/The-LinkedIn #
+# bit.ly/The-Gitlab        Git         bit.ly/The-Github #
+# bit.ly/The-BSD         License          bit.ly/The-GNU #
+#--------------------------------------------------------#
+info: |-
+  #
+  #     VMware Cloud Assembly Blueprint Code Sample     
+  # 
+  # - Creates a K8S Namespace with (optionaly) limits. 
+  #
+name: K8S - Create Namespace
+version: 1
+#-------------------------INPUTS-------------------------#
+inputs:
+  namespace:
+    type: string
+    description: Enter a Namespace name
+    title: Namespace Name
+#-----------------------RESOURCES------------------------#
+resources:
+  Cloud_K8S_Namespace_1:
+    type: Cloud.K8S.Namespace
+    properties:
+      # Examples for limits. Can get them via :
+      # kubectl --kubeconfig=<path_To_kubectl_yaml> describe namespaces <Name>
+      limits:
+        - limit: 20
+          resource: pods
+        - limit: 2
+          resource: requests.cpu
+        - limit: 8Gi
+          resource: requests.memory
+        - limit: 2
+          resource: limits.cpu
+        - limit: 8Gi
+          resource: limits.memory
+      name: '${input.namespace}'

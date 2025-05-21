@@ -1,0 +1,48 @@
+#--------------------------------------------------------#
+#                     Spas Kaloferov                     #
+#                   www.kaloferov.com                    #
+# bit.ly/The-Twitter      Social     bit.ly/The-LinkedIn #
+# bit.ly/The-Gitlab        Git         bit.ly/The-Github #
+# bit.ly/The-BSD         License          bit.ly/The-GNU #
+#--------------------------------------------------------#
+  #
+  #       VMware Cloud Assembly Blueprint Code Sample          
+  # 
+  # [Info]
+  #  - Creates Kubernetes (KBs) Cluster 
+  #
+name: K8S - Create Cluster
+version: 1
+#-------------------------INPUTS-------------------------#
+inputs:
+  cluster-name:
+    type: string
+    minLength: 1
+    # maxLength: The max for TMC Cluster  name is 22. 
+    # If ePKS prefix is added for TMC integration, subtract  from maxLength
+    maxLength: 22
+    pattern: '^[-a-z0-9]*$'
+    description: |
+      Enter Cluster Name
+      Name must start and with a letter, and can contain only lowercase letters, numbers, and hyphens.
+    default: cluster-01
+    title: Cluster Name
+  k8s-zone:
+    type: string
+    oneOf:
+      - title: Enterprice PKS
+        const: 'cas.kubs.zone.source:epks'
+    default: 'cas.kubs.zone.source:epks'
+    description: Select K8S Zone
+    title: K8S Zone
+#------------------------RESOURCES-----------------------#
+resources:
+  cluster-01:
+    type: Cloud.K8S.Cluster
+    properties:
+      description: ElasticSky Cluster
+      name: '${input.cluster-name}'
+      hostname: '${input.cluster-name}'
+      connectBy: ip
+      constraints:
+        - tag: '${input.k8s-zone}'
