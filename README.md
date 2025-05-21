@@ -74,6 +74,7 @@ A comprehensive collection of VMware Aria Automation (formerly vRA) Cloud Assemb
 - [Networking & Security/On-Demand NSX Networks](./Networking%20%26%20Security/On-Demand%20NSX%20Networks) - Dynamic NSX network provisioning
 
 ### Configuration Management
+- [VM with Saltstack](./VM%20with%20Saltstack.yml) - Template for deploying a Windows Server VM with SaltStack configuration management integration. Includes automatic SaltStack agent installation and state file application.
 - [ansible-control-machine](./ansible-control-machine) - Ansible control node
 - [saltstack-add-grains](./saltstack-add-grains) - SaltStack configuration
 - [VM with Saltstack](./VM%20with%20Saltstack.yml) - VM with SaltStack integration
