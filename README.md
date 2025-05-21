@@ -1,5 +1,7 @@
 # Collection of vRA Cloud Assembly Cloud Templates
 
+<a href="https://app.commanddash.io/agent?github=M.Goyal/Aria_Automation_Templates"><img src="https://img.shields.io/badge/AI-Code%20Assist-EB9FDA"></a>
+
 A comprehensive collection of VMware Aria Automation (formerly vRA) Cloud Assembly templates for various infrastructure and application deployments. Help make it even bigger by contributing. Built with love.
 
 ## Table of Contents
