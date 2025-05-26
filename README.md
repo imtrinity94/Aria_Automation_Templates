@@ -6,9 +6,12 @@ Welcome to the Aria Automation Templates Collection! This repository contains a 
 
 To use these templates:
 1. 📥 Clone this repository
-2. 🔄 Import the desired template into your Aria Automation environment
-3. ⚙️ Configure the template according to your environment
-4. 🚀 Deploy!
+2. 🔄 Add GitHub Integration into your Aria Automation environment
+3. Add Integration to your project and on Design tab, click Sync Repos
+4. All the templates should be available in your environment.
+<img width="446" alt="image" src="https://github.com/user-attachments/assets/f8ca7c39-9b5c-409f-a9ef-efed0afe04cf" /> 
+6. ⚙️ Tweak the template according to your needs
+7. 🚀 Deploy!
 
 ## 💡 Example Template
 
