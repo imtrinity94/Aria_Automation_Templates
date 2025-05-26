@@ -9,7 +9,7 @@ To use these templates:
 2. 🔄 Add GitHub Integration into your Aria Automation environment
 3. Add Integration to your project and on Design tab, click Sync Repos
 4. All the templates should be available in your environment.
-<img width="446" alt="image" src="https://github.com/user-attachments/assets/f8ca7c39-9b5c-409f-a9ef-efed0afe04cf" /> 
+</br><img width="446" alt="image" src="https://github.com/user-attachments/assets/f8ca7c39-9b5c-409f-a9ef-efed0afe04cf" /> </br>
 6. ⚙️ Tweak the template according to your needs
 7. 🚀 Deploy!
 
