@@ -1,0 +1,207 @@
+formatVersion: 1
+name: Tomcat8_Ubuntu1604_CentOS7
+version: 1
+description: Install Tomcat server on Ubuntu and CentOS
+inputs:
+  region:
+    type: string
+    description: Tag assigned to the compute resource in the Cloud zone
+    title: Region Tag Name
+  network:
+    type: string
+    description: Tag assigned to the subnet in Network Profiles
+    title: Network Tag Name
+  image:
+    type: string
+    enum:
+      - ubuntu1604
+      - centOS7
+    description: Image/OS required
+    title: Image/OS
+    default: ubuntu1604
+  flavor:
+    type: string
+    enum:
+      - small
+      - medium
+    description: Size of Nodes
+    title: Node Size
+    default: small
+  key:
+    type: string
+    title: Public Key
+    description: Input Public Key outputted from the script
+    default: ENTER-PUBLIC-KEY  
+resources:
+  MASTER:
+    type: Cloud.Machine
+    properties:
+      name: master
+      flavor: '${input.flavor}'
+      image: '${input.image}'
+      cloudConfig: |
+        #cloudconfig
+        repo_update: true
+        repo_upgrade: all
+        package_update: true
+        package_upgrade: all
+
+        packages:
+         - openssh-server
+         - wget
+         
+        runcmd:
+         - echo "${input.key}" >> /root/.ssh/authorized_keys
+         
+         - echo 'Setting hostname'
+         - FILE="/root/checkHostName.sh"
+         - /bin/cat <<EOM >$FILE
+         - if [ "`cat /etc/os-release | head -1 | cut -d'=' -f 2 | cut -d '"' -f 2`" == "Ubuntu" ]
+         - then
+         - apt-get install libaio1
+         - else
+         - yum -y install bind
+         - yum -y install bind-utils
+         - fi
+         - node_ip=\`host myip.opendns.com resolver1.opendns.com | grep "myip.opendns.com has" | awk '{print \$4}'\`
+         - if [ \$node_ip ]
+         - then
+         - echo \$node_ip > /root/privateOrpublic.txt
+         - else
+         - echo \$node_ip > /root/privateOrpublic.txt
+         - if [ "`cat /etc/os-release | head -1 | cut -d'=' -f 2 | cut -d '"' -f 2`" == "Ubuntu" ]
+         - then
+         - node_ip=\`ifconfig \$(route | grep '^default' | grep -o '[^ ]*\$') | grep 'inet addr' | cut -d ':' -f 2 | cut -d ' ' -f 1\`
+         - else
+         - node_ip=\`ifconfig \$(route | grep '^default' | grep -o '[^ ]*\$') | grep 'inet ' | cut -d ' ' -f 10\`
+         - fi
+         - ip=\`dig -x \$node_ip +short\`
+         - host_name=\$(basename \$ip .)
+         - echo \$host_name > /etc/hostname
+         - hostnamectl set-hostname \$host_name
+         - fi
+         - EOM
+         - chmod +x /root/checkHostName.sh
+         - sudo bash /root/checkHostName.sh
+         - rm checkHostName.sh
+         
+         - echo 'Detects OS and executes OS specific commands'
+         - FILE=/root/detect_os.sh
+         - /bin/cat << EOM >$FILE
+         - cat /etc/os-release | grep 'CentOS' &> /dev/null
+         - if [ \$? == 0 ]; then
+         -    echo "Install JDK on CentOS"
+         -    sudo yum install -y java-1.8.0-openjdk-devel
+         - fi
+         - cat /etc/os-release | grep 'Ubuntu' &> /dev/null
+         - if [ \$? == 0 ]; then
+         -    echo "Install JDK on Ubuntu"
+         -    sudo apt-get install -y openjdk-8-jdk
+         - fi
+         - EOM
+         
+         - chmod +x /root/detect_os.sh
+         - bash /root/detect_os.sh
+         
+         - sleep 120s
+         - echo 'Download and install tomcat and give it proper permissions'
+         - sudo groupadd tomcat
+         - sudo useradd -s /bin/false -g tomcat -d /opt/tomcat tomcat
+         - cd /tmp
+         - wget http://archive.apache.org/dist/tomcat/tomcat-8/v8.5.34/bin/apache-tomcat-8.5.34.tar.gz
+         - sudo mkdir /opt/tomcat
+         - sudo tar xzvf apache-tomcat-8*tar.gz -C /opt/tomcat --strip-components=1
+         
+         - cd /opt/tomcat
+         - sudo chgrp -R tomcat /opt/tomcat
+         - sudo chmod -R g+r conf
+         - sudo chmod g+x conf
+         - sudo chown -R tomcat work/ webapps/ temp/ logs/
+
+         - echo 'create a systemd service file'
+         - FILE=/etc/systemd/system/tomcat.service
+         - /bin/cat << EOM >$FILE
+         - '[unit]'
+         - Description=Apache Tomcat Web Application Container
+         - After=network.target
+         - '[Service]'
+         - Type=forking
+         - Environment=JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64/jre
+         - Environment=CATALINA_PID=/opt/tomcat/temp/tomcat.pid
+         - Environment=CATALINA_HOME=/opt/tomcat
+         - Environment=CATALINA_BASE=/opt/tomcat
+         - Environment='CATALINA_OPTS=-Xms512M -Xmx1024M -server -XX:+UseParallelGC'
+         - Environment='JAVA_OPTS=-Djava.awt.headless=true -Djava.security.egd=file:/dev/./urandom' 
+         - ExecStart=/opt/tomcat/bin/startup.sh
+         - ExecStop=/opt/tomcat/bin/shutdown.sh
+         - User=tomcat
+         - Group=tomcat
+         - UMask=0007
+         - RestartSec=10
+         - Restart=always
+         - '[Install]'
+         - WantedBy=multi-user.target
+         - EOM
+         
+         - FILE=/root/update_jdk.sh
+         - /bin/cat << EOM >$FILE
+         - cat /etc/os-release | grep 'CentOS' &> /dev/null
+         - if [ \$? == 0 ]; then
+         -    echo "Configure tomcat.service on CentOS"
+         -    echo 'JAVA_HOME=/usr/lib/jvm/java' >> /root/.bash_profile
+         -    echo 'export JAVA_HOME' >> /root/.bash_profile
+         -    sed -i "s|/usr/lib/jvm/java-1.8.0-openjdk-amd64/jre|/usr/lib/jvm/java/jre|g"  /etc/systemd/system/tomcat.service
+         - fi
+         - cat /etc/os-release | grep 'Ubuntu' &> /dev/null
+         - if [ \$? == 0 ]; then
+         -    echo "Configure tomcat.service on Ubuntu"
+         -    echo 'JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64' >> /root/.bashrc
+         -    echo 'export JAVA_HOME' >> /root/.bashrc
+         -    sed -i "s|/usr/lib/jvm/java-1.8.0-openjdk-amd64/jre|/usr/lib/jvm/java-8-openjdk-amd64/jre|g"  /etc/systemd/system/tomcat.service
+         - fi
+         - EOM
+
+         - chmod +x /root/update_jdk.sh
+         - bash /root/update_jdk.sh
+
+         - sudo systemctl daemon-reload
+         - sudo systemctl start tomcat
+         
+         - FILE=/root/open_port.sh
+         - /bin/cat << EOM >$FILE
+         - cat /etc/os-release | grep 'CentOS' &> /dev/null
+         - if [ \$? == 0 ]; then
+         -    yum install firewalld -y
+         -    firewall-offline-cmd --add-port=8080/tcp
+         -    systemctl enable firewalld
+         -    systemctl start firewalld
+         -    firewall-cmd --reload
+         - fi
+         - cat /etc/os-release | grep 'Ubuntu' &> /dev/null
+         - if [ \$? == 0 ]; then
+         -    echo 'Open port 8080 on the firewall'
+         -    sudo ufw allow 8080
+         - fi
+         - EOM
+         - chmod +x /root/open_port.sh
+         - bash /root/open_port.sh
+
+         - sudo systemctl enable tomcat
+         
+         - echo 'Configure Tomcat Web Management Interface'
+         - sed -i 's|</tomcat-users>|<user username="admin" password="changeme" roles="manager-gui,admin-gui"/></tomcat-users>|g'  /opt/tomcat/conf/tomcat-users.xml
+         - sed -i 's|<Valve|<!--<Valve|g' /opt/tomcat/webapps/host-manager/META-INF/context.xml
+         - sed -i 's|0:0:0:0:0:0:0:1" />|0:0:0:0:0:0:0:1" />-->|g' /opt/tomcat/webapps/host-manager/META-INF/context.xml
+         - sudo systemctl restart tomcat
+      constraints:
+        - tag: '${input.region}'
+      networks:
+        - name: '${resource.Tomcat_Network.name}'
+  Tomcat_Network:
+    type: Cloud.Network
+    properties:
+      name: tomcat_network
+      networkType: existing
+      constraints:
+        - tag: '${input.network}'
+

@@ -1,0 +1,118 @@
+formatVersion: 1
+name: Nginx
+version: 1
+description: Installs Ngnix on Ubuntu and CentOS
+inputs:
+  region:
+    type: string
+    description: Region
+    title: Region Tag Name
+    default: ENTER-REGION-TAG
+  image:
+    type: string
+    enum:
+      - ubuntu1604
+      - centOS7
+    description: Image/OS required
+    title: Image/OS
+    default: ubuntu1604
+  flavor:
+    type: string
+    enum:
+      - small
+      - medium
+    description: Size of Nodes
+    title: Node Size
+    default: small
+  network:
+    type: string
+    title: Network Tag
+    description: Tag assigned to the subnet in Network Profiles
+    default: ENTER-NETWORK-TAG
+  key:
+    type: string
+    title: Public Key
+    description: Input Public Key outputted from the script
+    default: ENTER-PUBLIC-KEY 
+resources:
+  Nginx Machine:
+    type: Cloud.Machine
+    properties:
+      name: Nginx
+      flavor: '${input.flavor}'
+      image: '${input.image}'
+      cloudConfig: |
+        #cloudconfig
+        repo_update: true
+        repo_upgrade: all
+        package_update: true
+        package_upgrade: all
+        runcmd:
+         - echo "${input.key}" >> /root/.ssh/authorized_keys
+
+         - echo 'Setting hostname'
+         - FILE="/root/checkHostName.sh"
+         - /bin/cat <<EOM >$FILE
+         - if [ "`cat /etc/os-release | head -1 | cut -d'=' -f 2 | cut -d '"' -f 2`" == "Ubuntu" ]
+         - then
+         - apt-get install libaio1
+         - else
+         - yum -y install bind
+         - yum -y install bind-utils
+         - yum -y install redhat-lsb-core
+         - fi
+         - node_ip=\`host myip.opendns.com resolver1.opendns.com | grep "myip.opendns.com has" | awk '{print \$4}'\`
+         - if [ \$node_ip ]
+         - then
+         - echo \$node_ip > /root/privateOrpublic.txt
+         - else
+         - echo \$node_ip > /root/privateOrpublic.txt
+         - if [ "`cat /etc/os-release | head -1 | cut -d'=' -f 2 | cut -d '"' -f 2`" == "Ubuntu" ]
+         - then
+         - node_ip=\`ifconfig \$(route | grep '^default' | grep -o '[^ ]*\$') | grep 'inet addr' | cut -d ':' -f 2 | cut -d ' ' -f 1\`
+         - else
+         - node_ip=\`ifconfig \$(route | grep '^default' | grep -o '[^ ]*\$') | grep 'inet ' | cut -d ' ' -f 10\`
+         - fi
+         - ip=\`dig -x \$node_ip +short\`
+         - host_name=\$(basename \$ip .)
+         - echo \$host_name > /etc/hostname
+         - hostnamectl set-hostname \$host_name
+         - fi
+         - EOM
+         - chmod +x /root/checkHostName.sh
+         - sudo bash /root/checkHostName.sh
+         - rm checkHostName.sh
+
+         - FILE="/root/install_nginx.sh"
+         - /bin/cat <<EOM >$FILE
+         - if [[ \`cat /etc/os-release | head -1 | cut -d'=' -f 2 | cut -d '"' -f 2\` == *"CentOS Linux"* ]]; then
+         - echo "[nginx]" > /etc/yum.repos.d/nginx.repo
+         - echo "name=nginx repo" >> /etc/yum.repos.d/nginx.repo
+         - echo "baseurl=http://nginx.org/packages/centos/7/x86_64/" >> /etc/yum.repos.d/nginx.repo
+         - echo "gpgcheck=0" >> /etc/yum.repos.d/nginx.repo
+         - echo "enabled=1" >> /etc/yum.repos.d/nginx.repo
+         - sudo yum install -y nginx && sudo systemctl start nginx
+         - sudo yum install -y firewalld && sudo systemctl start firewalld && sudo systemctl stop firewalld
+         - else
+         - nginx=stable
+         - sudo add-apt-repository -y ppa:nginx/\$nginx && sudo apt-get update && sudo apt-get install -y nginx && systemctl start nginx
+         - sudo ufw --force enable
+         - sudo ufw allow 'Nginx FULL'
+         - sudo ufw allow ssh
+         - fi
+         - EOM
+
+         - chmod +x /root/install_nginx.sh
+         - sudo bash /root/install_nginx.sh
+      networks:
+        - name: '${resource.NginxNetwork.name}'
+      constraints:
+        - tag: '${input.region}'
+  NginxNetwork:
+    type: Cloud.Network
+    properties:
+      name: NgnixNetwork
+      networkType: existing
+      constraints:
+        - tag: '${input.network}'
+

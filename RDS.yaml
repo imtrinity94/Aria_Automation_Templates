@@ -1,0 +1,226 @@
+formatVersion: 1
+name: RDS-machine
+version: 1
+inputs:
+  region:
+    type: string
+    default: us-east-2
+    title: Provider Region
+    description: Enter Provider Region
+  clusternodecount:
+    type: integer
+    default: 1
+    title: RDS Cluster Nodes
+    description: Number of Nodes for RDS Cluster
+  rdsinstanceclass:
+    type: string
+    enum:
+      - db.r4.large
+      - db.m1.small
+      - db.m4.large
+    default: db.r4.large
+    title: RDS Instance Class
+    description: Enter the desired RDS Instance Class
+  dbengine:
+    type: string
+    enum:
+      - aurora
+      - aurora-mysql
+      - aurora-postgresql
+    default: aurora-mysql
+    title: Database Engine
+    description: Enter Database Engine
+  dbversion:
+    type: string
+    enum:
+      - 5.6.10a
+      - 5.7.12
+      - 9.6.8
+    default: 5.7.12
+    title: Database Version
+    description: Enter Database Version
+  dbport:
+    type: string
+    enum:
+      - '5432'
+      - '3306'
+    default: '3306'
+    title: Database Port
+    description: Enter Database Port
+  dbname:
+    type: string
+    default: my_db
+    title: Database Name
+    description: Enter Database Name
+  dbusername:
+    type: string
+    default: root
+    title: Database Username
+    description: Enter DB Username
+  dbpassword:
+    type: string
+    encrypted: true
+    title: Database Password
+    description: Enter Database Password
+  dbparametergroup:
+    type: string
+    enum:
+      - default.aurora5.6
+      - aurora-mysql5.7
+      - default.aurora-postgresql9.6
+    default: aurora-mysql5.7
+    title: DB Parameter Group
+    description: Enter Database Parameter Group
+  dbsubnetgroupname:
+    type: string
+    default: default-vpc-deaf46b7
+    title: Database subnet group name
+    description: Enter database subnet group name
+  vpcsecuritygroupid:
+    type: string
+    default: sg-f2c10499
+    title: VPC Security Group ID
+    description: Enter VPC Security Group ID
+  clusteridentifier:
+    type: string
+    default: cluster
+    title: Cluster Identifier
+    description: RDS Cluster Identifier
+  instanceprefix:
+    type: string
+    default: instance-
+    title: Instance Name Prefix
+    description: RDS Instance Name Prefix
+  application_image:
+    type: string
+    enum:
+      - ubuntu1604
+    description: Image/OS required
+    title: Image/OS
+    default: ubuntu1604
+  application_flavor:
+    type: string
+    enum:
+      - micro
+      - small
+      - medium
+    description: Size of Nodes
+    title: Flavor
+    default: small
+  key:
+    type: string
+    title: SSH Public Key
+    description: Input Public Key outputted from the script
+resources:
+  Demo-RDS-cluster:
+    type: Cloud.Service.AWS.RDS.Cluster
+    properties:
+      account: OOTB_AWS
+      region: us-east-2
+      database_name: '${input.dbname}'
+      master_username: '${input.dbusername}'
+      master_password: '${input.dbpassword}'
+      cluster_identifier: '${input.clusteridentifier}'
+      engine: '${input.dbengine}'
+      engine_version: '${input.dbversion}'
+      db_subnet_group_name: '${input.dbsubnetgroupname}'
+      vpc_security_group_ids:
+        - '${input.vpcsecuritygroupid}'
+      networks:
+        - name: '${resource.DB-net.name}'
+      backtrack_window: 0
+      storage_encrypted: false
+      deletion_protection: false
+      backup_retention_period: 1
+      final_snapshot_identifier: demo-rds-cluster
+      skip_final_snapshot: true
+      iam_database_authentication_enabled: false
+      preferred_backup_window: '03:00-06:00'
+      preferred_maintenance_window: 'Mon:00:00-Mon:03:00'
+      db-cluster-parameter-group-name: '${input.dbparametergroup}'
+  Demo-RDS-instance:
+    type: Cloud.Service.AWS.RDS.Cluster.Instance
+    properties:
+      account: OOTB_AWS
+      region: us-east-2
+      engine: '${input.dbengine}'
+      engine_version: '${input.dbversion}'
+      count: '${input.clusternodecount}'
+      instance_class: '${input.rdsinstanceclass}'
+      cluster_identifier: '${resource["Demo-RDS-cluster"].id}'
+      identifier_prefix: '${input.instanceprefix}'
+      db_subnet_group_name: '${input.dbsubnetgroupname}'
+      license-model: general-public-license
+      networks:
+        - name: '${resource.DB-net.name}'
+      promotion_tier: 0
+      monitoring_interval: 0
+      publicly_accessible: true
+      auto_minor_version_upgrade: true
+      public_accessible: true
+      port: '${input.dbport}'
+  WordPress-wp:
+    type: Cloud.Machine
+    properties:
+      name: WordPress-wp
+      image: '${input.application_image}'
+      flavor: '${input.application_flavor}'
+
+      cloudConfig: |
+        #cloud-config
+        repo_update: true
+        repo_upgrade: all
+
+        packages:
+         - apache2
+         - php
+         - php-mysql
+         - libapache2-mod-php
+         - php-mcrypt
+         - mysql-client
+
+        runcmd:
+         - echo 'Setting default password to changme which should be updated after deployment'
+         - echo root:changeme|sudo chpasswd
+         - sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g'  /etc/ssh/sshd_config
+         - sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/g'  /etc/ssh/sshd_config
+         - systemctl restart sshd
+         
+         - FILE="/root/db_setup.sh"
+         - /bin/cat <<EOM >$FILE
+         - mkdir -p /var/www/html/mywordpresssite && cd /var/www/html && wget https://wordpress.org/latest.tar.gz && tar -xzf /var/www/html/latest.tar.gz -C /var/www/html/mywordpresssite --strip-components 1
+         - i=0; while [ \$i -le 5 ]; do mysql --connect-timeout=3 -h ${resource["Demo-RDS-instance"].endpoint[0]} -u ${input.dbusername} -p${input.dbpassword} -e "SHOW STATUS;" && break || sleep 15; i=\$((i+1)); done
+         - mysql -u root -p${input.dbpassword} -h ${resource["Demo-RDS-instance"].endpoint[0]} -e "create database wordpress_blog;"
+         - mv /var/www/html/mywordpresssite/wp-config-sample.php /var/www/html/mywordpresssite/wp-config.php
+         - sed -i -e s/"define( 'DB_NAME', 'database_name_here' );"/"define( 'DB_NAME', 'wordpress_blog' );"/ /var/www/html/mywordpresssite/wp-config.php
+         - sed -i -e s/"define( 'DB_USER', 'username_here' );"/"define( 'DB_USER', '${input.dbusername}' );"/ /var/www/html/mywordpresssite/wp-config.php 
+         - sed -i -e s/"define( 'DB_PASSWORD', 'password_here' );"/"define('DB_PASSWORD', '${input.dbpassword}');"/ /var/www/html/mywordpresssite/wp-config.php 
+         - sed -i -e s/"define( 'DB_HOST', 'localhost' );"/"define('DB_HOST', '${resource["Demo-RDS-instance"].endpoint[0]}');"/ /var/www/html/mywordpresssite/wp-config.php
+         - EOM
+
+         - chmod 700 /root/db_setup.sh
+         - /root/db_setup.sh
+         - service apache2 reload
+         
+         - sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/g'  /etc/ssh/sshd_config
+         - sed -i 's/PermitRootLogin yes/PermitRootLogin prohibit-password/g'  /etc/ssh/sshd_config
+         - echo "${input.key}" >> /root/.ssh/authorized_keys
+         - systemctl restart sshd
+         
+      networks:
+        - name: '${resource["WordPress-net"].name}'
+          network: '${resource["WordPress-net"].id}'
+        - name: '${resource["DB-net"].name}'
+          network: '${resource["DB-net"].id}'
+ 
+  DB-net:
+    type: Cloud.Network
+    properties:
+      name: DB-net
+      networkType: existing
+  WordPress-net:
+    type: Cloud.Network
+    properties:
+      name: WordPress-net
+      networkType: public
+

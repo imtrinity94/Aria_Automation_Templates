@@ -1,0 +1,348 @@
+formatVersion: 1
+name: jenkins-machine
+version: 1
+description: Supports single- as well as multi-tier
+inputs:
+  region:
+    type: string
+    description: Region
+    title: Region Tag Name
+    default: ENTER-REGION-TAG
+  master_image:
+    type: string
+    enum:
+      - ubuntu1604
+      - CentOS7
+    description: Image/OS required
+    title: Image/OS for Master
+    default: ubuntu1604
+  node_image:
+    type: string
+    enum:
+      - ubuntu1604
+      - CentOS7
+    description: Image/OS required
+    title: Image/OS for Slave
+    default: ubuntu1604
+  flavor:
+    type: string
+    enum:
+      - small
+      - medium
+    description: Size of Nodes
+    title: Node Size
+    default: small
+  network:
+    type: string
+    title: Network Tag
+    description: Tag assigned to the subnet in Network Profiles
+    default: ENTER-NETWORK-TAG
+  slaves:
+    type: integer
+    description: Enter 0 in case you want to do everything on master
+    title: No. of slaves
+    default: 2
+  key:
+    type: string
+    title: Public Key
+    description: Input Public Key outputted from the script
+    default: ENTER-PUBLIC-KEY
+resources:
+  JenkinsNode:
+    type: Cloud.Machine
+    properties:
+      name: nodeOfJenkins
+      flavor: '${input.flavor}'
+      image: '${input.node_image}'
+      count: '${input.slaves}'
+      cloudConfig: |
+        #cloudconfig
+        repo_update: true
+        repo_upgrade: all
+        package_update: true
+        package_upgrade: all
+
+        packages:
+         - wget
+         - deb
+
+        runcmd:
+         - echo "${input.key}" >> /root/.ssh/authorized_keys
+
+         - FILE="/root/checkHostName.sh"
+         - /bin/cat <<EOM >$FILE
+         - if [[ \`cat /etc/os-release | head -1 | cut -d'=' -f 2 | cut -d '"' -f 2\` == *"CentOS Linux"* ]]; then
+         - yum install -y bind-utils
+         - fi
+         - node_ip=\`host myip.opendns.com resolver1.opendns.com | grep "myip.opendns.com has" | awk '{print \$4}'\`;
+         - if [ \$node_ip ]; then
+            echo \$node_ip > /root/privateOrpublic.txt;
+           else
+            echo \$node_ip > /root/privateOrpublic.txt;
+            node_ip=\`ifconfig \$(route | grep '^default' | grep -o '[^ ]*\$') | grep 'inet addr' | cut -d ':' -f 2 | cut -d ' ' -f 1\`;
+            ip=\`dig -x \$node_ip +short\`;
+            host_name=\$(basename \$ip .);
+            echo \$host_name > /etc/hostname;
+            cat /etc/hostname;
+            hostnamectl set-hostname \$host_name;
+            hostname;
+            echo \$node_ip \$host_name >> /etc/hosts;
+           fi
+         - EOM
+
+         - chmod +x /root/checkHostName.sh
+         - sudo /root/checkHostName.sh
+
+         - FILE="/root/install_java.sh"
+         - /bin/cat <<EOM >$FILE
+         - if [[ \`cat /etc/os-release | head -1 | cut -d'=' -f 2 | cut -d '"' -f 2\` == *"Ubuntu"* ]]; then
+            echo "Ubuntu";
+            sudo apt-get install -y default-jre default-jdk;
+           else
+            echo "CentOS";
+            sudo yum install -y java-1.8.0-openjdk-devel;
+           fi
+         - EOM
+
+         - chmod +x /root/install_java.sh
+         - sudo bash /root/install_java.sh
+      networks:
+        - name: '${resource.Jenkins_Network.name}'
+      constraints:
+        - tag: '${input.region}'
+  JenkinsMaster:
+    type: Cloud.Machine
+    properties:
+      name: masterOfJenkins
+      flavor: '${input.flavor}'
+      image: '${input.master_image}'
+      cloudConfig: |
+        #cloudconfig
+        repo_update: true
+        repo_upgrade: all
+        package_update: true
+        package_upgrade: all
+
+        packages:
+         - wget
+         - deb
+
+        runcmd:
+         - echo "${input.key}" >> /root/.ssh/authorized_keys
+
+         - FILE="/root/checkHostName.sh"
+         - /bin/cat <<EOM >$FILE
+         - if [[ \`cat /etc/os-release | head -1 | cut -d'=' -f 2 | cut -d '"' -f 2\` == *"CentOS Linux"* ]]; then
+         - yum install -y bind-utils
+         - fi
+         - node_ip=\`host myip.opendns.com resolver1.opendns.com | grep "myip.opendns.com has" | awk '{print \$4}'\`;
+         - if [ \$node_ip ]; then
+            echo \$node_ip > /root/privateOrpublic.txt;
+           else
+            echo \$node_ip > /root/privateOrpublic.txt;
+            node_ip=\`ifconfig \$(route | grep '^default' | grep -o '[^ ]*\$') | grep 'inet addr' | cut -d ':' -f 2 | cut -d ' ' -f 1\`;
+            ip=\`dig -x \$node_ip +short\`;
+            host_name=\$(basename \$ip .);
+            echo \$host_name > /etc/hostname;
+            cat /etc/hostname;
+            hostnamectl set-hostname \$host_name;
+            hostname;
+            echo \$node_ip \$host_name >> /etc/hosts;
+           fi
+         - EOM
+
+         - chmod +x /root/checkHostName.sh
+         - sudo /root/checkHostName.sh
+
+         - FILE="/root/install_java.sh"
+         - /bin/cat <<EOM >$FILE
+         - if [[ \`cat /etc/os-release | head -1 | cut -d'=' -f 2 | cut -d '"' -f 2\` == *"Ubuntu"* ]]; then
+            echo "Ubuntu";
+            sudo apt-get install -y default-jre default-jdk;
+           else
+            echo "CentOS";
+            sudo yum install -y java-1.8.0-openjdk-devel;
+           fi
+         - EOM
+
+         - FILE="/root/setup_jenkins.sh"
+         - /bin/cat <<EOM >$FILE
+         - echo "=====Jenkins configuration log starts====="
+         - cd /root/.jenkins/
+         - sed -i &#39;s,<securityRealm class="hudson.security.SecurityRealm\$None"/>,<securityRealm class="hudson.security.HudsonPrivateSecurityRealm">\n\t<disableSignup>false</disableSignup>\n\t<enableCaptcha>false</enableCaptcha>\n  </securityRealm>,g&#39; config.xml
+         - echo "Changed security credentials from no security."
+         - sed -i &#39;s,</label>,</label>\n  <crumbIssuer class="hudson.security.csrf.DefaultCrumbIssuer">\n\t<excludeClientIPFromCrumb>true</excludeClientIPFromCrumb>\n  </crumbIssuer>,g&#39; config.xml
+         - echo "Crumb set up."
+         - wget http&#58;//localhost&#58;8080/jnlpJars/jenkins-cli.jar
+         - echo "Downloaded jenkins jar"
+         - java -jar jenkins-cli.jar -s http&#58;//localhost&#58;8080 restart
+         - echo "Restarted Jenkins"
+         - sleep 30s
+         - cd /root/.jenkins/
+         - java -jar jenkins-cli.jar -s http&#58;//localhost&#58;8080/ install-plugin credentials -deploy
+         - echo "Installed credentials plugins"
+         - echo &#39;jenkins.model.Jenkins.instance.securityRealm.createAccount("admin", "changeme")&#39; | java -jar jenkins-cli.jar -s http&#58;//localhost&#58;8080/ groovy =
+         - echo "Admin account created."
+         - sed -i &#39;s,<authorizationStrategy class="hudson.security.AuthorizationStrategy\$Unsecured"/>,<authorizationStrategy class="hudson.security.FullControlOnceLoggedInAuthorizationStrategy">\n\t<denyAnonymousReadAccess>true</denyAnonymousReadAccess>  </authorizationStrategy>,g&#39; config.xml
+         - java -jar jenkins-cli.jar -s http&#58;//localhost&#58;8080 restart
+         - echo "Restarted Jenkins"
+         - sleep 30s
+         - CRUMB=\$(curl -s &#39;http&#58;//admin&#58;changeme@localhost&#58;8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,"&#58;",//crumb)&#39;)
+         - echo "Crumb issued"
+         - echo \$CRUMB
+         - curl -H \$CRUMB -X POST &#39;http&#58;//admin&#58;changeme@localhost&#58;8080/credentials/store/system/domain/_/createCredentials&#39; --data-urlencode &#39;json={ ""&#58; "0", "credentials"&#58; { "scope"&#58; "GLOBAL", "id"&#58; "vmwCred", "username"&#58; "root", "password"&#58; "changeme", "description"&#58; "Credentials for slaves", "\$class"&#58; "com.cloudbees.plugins.credentials.impl.UsernamePasswordCredentialsImpl"} }&#39;
+         - EOM
+
+         - sed -i 's/\&#58;/:/g' /root/setup_jenkins.sh
+         - sed -i "s/\&#39;/'/g" /root/setup_jenkins.sh
+         - chmod +x /root/setup_jenkins.sh
+
+         - FILE="/root/slaveConfig.xml"
+         - /bin/cat <<EOM >$FILE
+         - <?xml version=&#39;1.1&#39; encoding=&#39;UTF-8&#39;?>
+         - <slave>
+         - <name>SLAVE</name>
+         - <description></description>
+         - <remoteFS>/root/</remoteFS>
+         - <numExecutors>2</numExecutors>
+         - <mode>NORMAL</mode>
+         - <retentionStrategy class="hudson.slaves.RetentionStrategy\$Always"/>
+         - <launcher class="hudson.plugins.sshslaves.SSHLauncher" plugin="ssh-slaves@1.26">
+         - <host>rasgulla</host>
+         - <port>22</port>
+         - <credentialsId>vmwCred</credentialsId>
+         - <maxNumRetries>0</maxNumRetries>
+         - <retryWaitTime>0</retryWaitTime>
+         - <sshHostKeyVerificationStrategy class="hudson.plugins.sshslaves.verifiers.NonVerifyingKeyVerificationStrategy"/>
+         - </launcher>
+         - <label>slave</label>
+         - <nodeProperties/>
+         - </slave>
+         - EOM
+
+         - echo "${resource.JenkinsNode.address}" > /root/node_addresses.txt
+         - sed -i 's/\[//g' /root/node_addresses.txt
+         - sed -i 's/\]//g' /root/node_addresses.txt
+         - sed -i 's/,/\n/g' /root/node_addresses.txt
+
+         - sed -i 's/\&#58;/:/g' /root/slaveConfig.xml
+         - sed -i "s/\&#39;/'/g" /root/slaveConfig.xml
+         - chmod +x /root/slaveConfig.xml
+
+         - export SLAVE_COUNT=${input.slaves}
+
+         - FILE="/root/runSlaveRun.sh"
+         - /bin/cat <<EOM >$FILE
+         - if [ ${input.slaves} -ge 1 ]
+         - then
+         - echo "There are slaves here";
+         - cd /root/.jenkins/;
+         - wget http&#58;//localhost&#58;8080/jnlpJars/agent.jar;
+         - CRUMB=\$(curl -s &#39;http&#58;//admin&#58;changeme@localhost&#58;8080/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,"&#58;",//crumb)&#39;);
+         - crum=\`echo \$CRUMB | cut -d&#39;&#58;&#39; -f 2\`;
+         - echo \$crum;
+         - for i in \`seq 1 $SLAVE_COUNT\`;
+         - do
+         - nodeIP=\`head -\$i /root/node_addresses.txt | tail -1\`;
+         - sed -i &#39;s/rasgulla/&#39;"\$nodeIP"&#39;/g&#39; /root/slaveConfig.xml;
+         - cat /root/slaveConfig.xml | java -jar jenkins-cli.jar -s http&#58;//admin&#58;changeme@localhost&#58;8080/ create-node slave_\$i;
+         - secret_key=\$(curl -L -s -u admin&#58;changeme -H ".crumb&#58;\$CRUMB" -X GET http&#58;//localhost&#58;8080/computer/slave_\$i/slave-agent.jnlp | sed "s/.*<application-desc main-class=\"hudson.remoting.jnlp.Main\"><argument>\([a-z0-9]*\).*/\1/");
+         - java -jar agent.jar -jnlpUrl http&#58;//admin&#58;changeme@localhost&#58;8080/computer/slave_\$i/slave-agent.jnlp -secret \$secret_key &
+         - sleep 10s;
+         - sed -i &#39;s/&#39;"\$nodeIP"&#39;/rasgulla/g&#39; /root/slaveConfig.xml;
+         - done
+         - fi
+         - EOM
+
+         - sed -i 's/\&#58;/:/g' /root/runSlaveRun.sh
+         - sed -i "s/\&#39;/'/g" /root/runSlaveRun.sh
+         - chmod +x /root/runSlaveRun.sh
+
+         - FILE="/root/install_plugins.sh"
+         - /bin/cat <<EOM >$FILE
+         - cd /root/.jenkins/;
+         - rm jenkins-cli.jar*
+         - wget http&#58;//admin&#58;changeme@localhost&#58;8080/jnlpJars/jenkins-cli.jar
+         - java -jar jenkins-cli.jar -s http&#58;//admin&#58;changeme@localhost&#58;8080/ install-plugin ace-editor ant antisamy-markup-formatter apache-httpcomponents-client-4-api authentication-tokens bouncycastle-api branch-api build-timeout cloudbees-folder command-launcher credentials-binding credentials display-url-api docker-commons docker-workflow durable-task email-ext git-client git-server git github-api github-branch-source github gradle handlebars jackson2-api jdk-tool jquery-detached jsch junit ldap mailer mapdb-api matrix-auth matrix-project momentjs pam-auth pipeline-build-step pipeline-github-lib pipeline-graph-analysis pipeline-input-step pipeline-milestone-step pipeline-model-api pipeline-model-declarative-agent pipeline-model-definition pipeline-model-extensions pipeline-rest-api pipeline-stage-step pipeline-stage-tags-metadata pipeline-stage-view plain-credentials resource-disposer scm-api script-security ssh-credentials ssh-slaves structs subversion timestamper token-macro workflow-aggregator workflow-api workflow-basic-steps workflow-cps-global-lib workflow-cps workflow-durable-task-step workflow-job workflow-multibranch workflow-scm-step workflow-step-api workflow-support ws-cleanup -deploy
+         - EOM
+
+         - sed -i 's/\&#58;/:/g' /root/install_plugins.sh
+         - sed -i "s/\&#39;/'/g" /root/install_plugins.sh
+         - chmod +x /root/install_plugins.sh
+
+         - FILE="/root/waitTillCompletion.sh"
+         - /bin/cat <<EOM >$FILE
+         - if [[ \`cat /etc/os-release | head -1 | cut -d'=' -f 2 | cut -d '"' -f 2\` == *"CentOS Linux"* ]]; then
+         - while true; do
+         - if [[ \`sudo grep cloud-init /var/log/messages | tail -1\` == *"INFO&#58; Finished Download metadata."* ]]; then
+         - break;
+         - else
+         - echo "Sleeping" >> /root/dumpingJumpak.txt;
+         - sleep 5s;
+         - fi
+         - done
+         - else
+         - while true; do
+         - if [[ \`tail -1 /var/log/cloud-init-output.log\` == *"INFO&#58; Finished Download metadata."* ]]; then
+         - break;
+         - else
+         - echo "Sleeping" >> /root/dumpingDumpak.txt;
+         - sleep 5s;
+         - fi
+         - done
+         - fi
+         - EOM
+
+         - sed -i 's/\&#58;/:/g' /root/waitTillCompletion.sh
+         - chmod +x /root/waitTillCompletion.sh
+
+         - chmod +x /root/install_java.sh
+         - sudo bash /root/install_java.sh
+         
+         - echo "Starting Jenkins installation"
+         - wget http://mirrors.jenkins.io/war-stable/2.164.2/jenkins.war
+         - echo "Installation started!!"
+         - java -Djenkins.install.runSetupWizard=false -jar jenkins.war &
+         - echo "Installation over!!"
+         
+         - sudo bash /root/waitTillCompletion.sh
+         - echo "Wait over"
+         - sudo bash /root/setup_jenkins.sh
+         - echo "Set-up done"
+         - sleep 20s
+         - sudo bash /root/runSlaveRun.sh &
+         - echo "Slave ran"
+         - sleep 20s
+         - echo "Starting to install the plugins"
+         - sudo bash /root/install_plugins.sh
+
+         - sleep 10s
+         - echo "Last step"
+         - FILE="/root/open_firewall.sh"
+         - /bin/cat <<EOM >$FILE
+         - if [[ \`cat /etc/os-release | head -1 | cut -d'=' -f 2 | cut -d '"' -f 2\` == *"CentOS Linux"* ]]; then
+         - /bin/yum install firewalld -y
+         - firewall-offline-cmd --zone=public --add-port=8080/tcp
+         - /bin/systemctl stop firewalld
+         - /bin/systemctl start firewalld
+         - /bin/systemctl enable firewalld
+         - fi
+         - EOM
+         
+         - chmod +x /root/open_firewall.sh
+         - sudo bash /root/open_firewall.sh
+         
+         - java -jar /root/.jenkins/jenkins-cli.jar -s http://admin:changeme@localhost:8080 restart
+         
+      networks:
+        - name: '${resource.Jenkins_Network.name}'
+      constraints:
+        - tag: '${input.region}'
+  Jenkins_Network:
+    type: Cloud.Network
+    properties:
+      name: networkOfJenkins
+      networkType: existing
+      constraints:
+        - tag: '${input.network}'
+

@@ -1,0 +1,110 @@
+formatVersion: 1
+name: ruby-on-rails-machine
+version: 1
+description: Installs Ruby on Rails on Ubuntu
+inputs:
+  region:
+    type: string
+    description: Region
+    title: Region Tag Name
+    default: ENTER-REGION-TAG-NAME
+  image:
+    type: string
+    enum:
+      - ubuntu1604
+    description: Image/OS required
+    title: Image/OS
+    default: ubuntu1604
+  flavor:
+    type: string
+    enum:
+      - nano
+      - micro
+      - small
+      - medium
+      - large
+      - xlarge
+    description: Size of Nodes
+    title: Flavor (Node size)
+    default: small
+  network:
+    type: string
+    title: Network Tag
+    description: Tag assigned to the subnet in Network Profiles
+    default: ENTER-NETWORK-TAG-NAME
+  key:
+    type: string
+    title: Public Key
+    description: Input public key outputted from the script
+    default: ENTER-PUBLIC-KEY
+resources:
+  RoR-Machine:
+    type: Cloud.Machine
+    properties:
+      name: master
+      flavor: '${input.flavor}'
+      image: '${input.image}'
+      cloudConfig: |
+        #cloudconfig
+        repo_update: true
+        repo_upgrade: all
+        package_update: true
+        package_upgrade: all
+
+        packages:
+         - wget
+         - deb
+         
+        runcmd:
+         - echo "${input.key}" >> /root/.ssh/authorized_keys
+  
+         - FILE="/root/checkHostName.sh"
+         - /bin/cat <<EOM >$FILE
+         - node_ip=\`host myip.opendns.com resolver1.opendns.com | grep "myip.opendns.com has" | awk '{print \$4}'\`;
+         - if [ \$node_ip ]; then
+            echo \$node_ip > /root/privateOrpublic.txt;
+           else
+            echo \$node_ip > /root/privateOrpublic.txt;
+            node_ip=\`ifconfig \$(route | grep '^default' | grep -o '[^ ]*\$') | grep 'inet addr' | cut -d ':' -f 2 | cut -d ' ' -f 1\`;
+            ip=\`dig -x \$node_ip +short\`;
+            host_name=\$(basename \$ip .);
+            echo \$host_name > /etc/hostname;
+            cat /etc/hostname;
+            hostnamectl set-hostname \$host_name;
+            hostname;
+            echo \$node_ip \$host_name >> /etc/hosts;
+           fi
+         - EOM
+
+         - chmod +x /root/checkHostName.sh
+         - sudo /root/checkHostName.sh
+ 
+         - curl -sL https://deb.nodesource.com/setup_8.x | sudo -E bash -
+         - sudo rm /var/lib/dpkg/lock
+
+         - sudo apt-get -y install git-core curl zlib1g-dev build-essential libssl-dev libreadline-dev libyaml-dev libsqlite3-dev sqlite3 libxml2-dev libxslt1-dev libcurl4-openssl-dev software-properties-common libffi-dev nodejs
+
+         - cd /root/
+         - wget http://ftp.ruby-lang.org/pub/ruby/2.6/ruby-2.6.1.tar.gz
+         - tar -xzvf ruby-2.6.1.tar.gz
+         - cd ruby-2.6.1/
+         - ./configure
+         - make
+         - sudo make install
+         
+         - gem install bundler
+
+         - gem install rails -v 5.2.2
+         
+      networks:
+        - name: '${resource.RoRNetwork.name}'
+      constraints:
+        - tag: '${input.region}'
+  RoRNetwork:
+    type: Cloud.Network
+    properties:
+      name: RoRNetwork
+      networkType: existing
+      constraints:
+        - tag: '${input.network}'
+

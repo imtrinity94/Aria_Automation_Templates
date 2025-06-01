@@ -1,0 +1,319 @@
+name: Drupal multinode
+description: Description
+inputs:
+  image:
+    type: string
+    description: Image/OS required
+    title: Image/OS
+    default: ubuntu1604
+  flavor:
+    type: string
+    enum:
+      - small
+      - medium
+    description: Flavor
+    title: Flavor
+    default: medium
+  drupal_username:
+    type: string
+    title: Drupal Account Username
+    description: The username you would like to have for drupal installation.
+  network:
+    type: string
+    title: Network Capability tag
+resources:
+  SQL:
+    type: Cloud.Machine
+    properties:
+      name: sql
+      flavor: '${input.flavor}'
+      image: '${input.image}'
+      count: 2
+      cloudConfig: |
+        #cloudconfig
+        repo_update: true
+        repo_upgrade: all
+        package_update: true
+        package_upgrade: all
+
+        packages:
+         - libaio1
+         - wget
+         - dpkg
+         
+        runcmd:
+         
+         - echo root:changeme|sudo chpasswd
+         - sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g'  /etc/ssh/sshd_config
+         - sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/g'  /etc/ssh/sshd_config
+         - service sshd restart
+         
+         - cd /root
+
+         - FILE="/root/checkHostName.sh"
+         - /bin/cat <<EOM >$FILE
+         - node_ip=\`host myip.opendns.com resolver1.opendns.com | grep "myip.opendns.com has" | awk '{print \$4}'\`;
+         - if [ \$node_ip ]; then
+            echo \$node_ip > /root/privateOrpublic.txt;
+           else
+            echo \$node_ip > /root/privateOrpublic.txt;
+            node_ip=\`ifconfig \$(route | grep '^default' | grep -o '[^ ]*\$') | grep 'inet addr' | cut -d ':' -f 2 | cut -d ' ' -f 1\`;
+            ip=\`dig -x \$node_ip +short\`;
+            host_name=\$(basename \$ip .);
+            echo \$host_name > /etc/hostname;
+            cat /etc/hostname;
+            hostnamectl set-hostname \$host_name;
+            hostname;
+            echo \$node_ip \$host_name >> /etc/hosts;
+           fi
+         - EOM
+
+         - chmod +x /root/checkHostName.sh
+         - sudo /root/checkHostName.sh
+
+         - node_host=`hostname`;echo "$(ifconfig $(route | grep '^default' | grep -o '[^ ]*$') | grep "inet addr" | cut -d ':' -f 2 | cut -d ' ' -f 1) $node_host" >> /root/Node1.txt
+
+         - echo "[mysql_cluster]" >> /etc/my.cnf
+         - echo  "ndb-connectstring=managerhostname" >> etc/my.cnf
+                  
+         - wget http://ftp.airnet.ne.jp/mirror/mysql/Downloads/MySQL-Cluster-7.4/mysql-cluster-gpl-7.4.11-debian7-x86_64.deb
+         - dpkg -i mysql-cluster-gpl-7.4.11-debian7-x86_64.deb
+         
+         - mkdir -p /usr/local/mysql/data
+         
+         - systemctl enable rc-local.service
+         - sed -i '14i /opt/mysql/server-5.6/bin/ndbd' /etc/rc.local
+      networks:
+        - name: '${Drupal_Network.name}'
+  DRUPAL:
+    type: Cloud.Machine
+    properties:
+      name: drupal
+      count: 1
+      flavor: '${input.flavor}'
+      image: '${input.image}'
+      cloudConfig: |
+        #cloudconfig
+        repo_update: true
+        repo_upgrade: all
+        package_update: true
+        package_upgrade: all
+
+        packages:
+         - apache2
+         - curl
+         - git
+         - zip
+         - unzip
+         - wget
+         - libaio1
+         - dpkg
+         
+        runcmd:
+         - echo root:changeme|sudo chpasswd
+         - sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g'  /etc/ssh/sshd_config
+         - sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/g'  /etc/ssh/sshd_config
+         - systemctl restart sshd
+         
+         - cd /root
+
+         - FILE="/root/checkHostName.sh"
+         - /bin/cat <<EOM >$FILE
+         - node_ip=\`host myip.opendns.com resolver1.opendns.com | grep "myip.opendns.com has" | awk '{print \$4}'\`;
+         - if [ \$node_ip ]; then
+            echo \$node_ip > /root/privateOrpublic.txt;
+           else
+            echo \$node_ip > /root/privateOrpublic.txt;
+            node_ip=\`ifconfig \$(route | grep '^default' | grep -o '[^ ]*\$') | grep 'inet addr' | cut -d ':' -f 2 | cut -d ' ' -f 1\`;
+            ip=\`dig -x \$node_ip +short\`;
+            host_name=\$(basename \$ip .);
+            echo \$host_name > /etc/hostname;
+            cat /etc/hostname;
+            hostnamectl set-hostname \$host_name;
+            hostname;
+            echo \$node_ip \$host_name >> /etc/hosts;
+           fi
+         - EOM
+
+         - chmod +x /root/checkHostName.sh
+         - sudo /root/checkHostName.sh
+
+         - FILE="/root/set_mycnf.sh"
+         - /bin/cat <<EOM >$FILE
+         - echo "[mysql_cluster]" >> /etc/my.cnf
+         - echo  "ndb-connectstring=`hostname`" >> etc/my.cnf
+         - EOM
+                  
+         - adduser --disabled-password --gecos "" service_user
+         
+         - rm /var/lib/apt/lists/lock
+         - rm /var/cache/apt/archives/lock
+         - rm /var/lib/dpkg/lock
+         
+         - add-apt-repository -y ppa:ondrej/php
+         - apt-get update
+         - apt-get install --allow-unauthenticated -y sshpass php7.2
+         - apt-get install --allow-unauthenticated -y php-mysql php-gd php-pear php-xml php-curl php-zip php-mcrypt libapache2-mod-php7.2
+         
+         
+         - echo "${SQL.address}" >> /root/node_addresses.txt
+         - sed -i 's/\[//g' /root/node_addresses.txt
+         - sed -i 's/\]//g' /root/node_addresses.txt
+         
+         - echo "value=`cat /root/node_addresses.txt`" >> /root/config_ips.sh
+         - echo "arr=\$(echo \$value | tr \",\" \"\n\")" >> /root/config_ips.sh
+         - echo "var=1" >> /root/config_ips.sh
+         - echo "master_hostname=`hostname`"
+         - echo "for node in \$arr" >> /root/config_ips.sh
+         - echo "do" >> /root/config_ips.sh
+         - echo "    sshpass -p changeme ssh  -o "StrictHostKeyChecking no" root@\$node 'sed -i 's/managerhostname/\$master_hostname/g' /etc/my.cnf'
+         - echo "    sshpass -p 'changeme' scp -o StrictHostKeyChecking=no root@\$node:/root/Node1.txt /root/Node\$var.txt" >> /root/config_ips.sh
+         - echo "    cat /root/Node\$var.txt >> /root/AllIps.txt" >> /root/config_ips.sh
+         - echo "    cat /root/Node\$var.txt  >> /etc/hosts
+         - echo "    var=\$((var+1))" >> /root/config_ips.sh
+         - echo "done" >> /root/config_ips.sh
+         
+         - chmod +x /root/config_ips.sh
+         - ./root/config_ips.sh
+         
+         - manager_host=`hostname`;echo "$(ifconfig $(route | grep '^default' | grep -o '[^ ]*$') | grep "inet addr" | cut -d ':' -f 2 | cut -d ' ' -f 1) $manager_host" >> /root/Manager.txt
+         - cat /root/Manager.txt >> /root/AllIps.txt
+         
+         - wget http://ftp.airnet.ne.jp/mirror/mysql/Downloads/MySQL-Cluster-7.4/mysql-cluster-gpl-7.4.11-debian7-x86_64.deb
+         - dpkg -i mysql-cluster-gpl-7.4.11-debian7-x86_64.deb
+         
+         - echo "#!/bin/sh" >> /root/config_mysql.sh
+         - echo "master_hostname=`hostname`"
+         - echo "mkdir /var/lib/mysql-cluster" >> /root/config_mysql.sh
+         - echo "echo \"[ndb_mgmd]\" >> /var/lib/mysql-cluster/config.ini" >> /root/config_mysql.sh
+         - echo "echo \"hostname=\$master_hostname\" >> /var/lib/mysql-cluster/config.ini" >> /root/config_mysql.sh
+         - echo "echo \"datadir=/var/lib/mysql-cluster\" >> /var/lib/mysql-cluster/config.ini" >> /root/config_mysql.sh
+         - echo "echo >> /var/lib/mysql-cluster/config.ini" >> /root/config_mysql.sh
+         - echo "value=`cat /root/node_addresses.txt`" >> /root/config_mysql.sh
+         - echo "arr=\$(echo \$value | tr \",\" \"\n\")" >> /root/config_mysql.sh
+         - echo "var=1" >> /root/config_mysql.sh
+         - echo "for node in \$arr" >> /root/config_mysql.sh
+         - echo "do" >> /root/config_mysql.sh
+         - echo "    echo \"[ndbd]\" >> /var/lib/mysql-cluster/config.ini" >> /root/config_mysql.sh
+         - echo "    echo \"hostname=\$node\" >> /var/lib/mysql-cluster/config.ini" >> /root/config_mysql.sh
+         - echo "    echo \"datadir=/usr/local/mysql/data\" >> /var/lib/mysql-cluster/config.ini" >> /root/config_mysql.sh
+         - echo "    echo >> /var/lib/mysql-cluster/config.ini" >> /root/config_mysql.sh
+         - echo "    var=\$((var+1))" >> /root/config_mysql.sh
+         - echo "done" >> /root/config_mysql.sh
+         - echo "echo \"[mysqld]\" >> /var/lib/mysql-cluster/config.ini" >> /root/config_mysql.sh
+         - echo "echo \"hostname=\$master_hostname\" >> /var/lib/mysql-cluster/config.ini" >> /root/config_mysql.sh  
+         
+         - chmod +x /root/config_mysql.sh
+         - /root/config_mysql.sh
+         
+         - /opt/mysql/server-5.6/bin/ndb_mgmd -f /var/lib/mysql-cluster/config.ini
+         - sudo systemctl enable rc-local.service
+         
+         - sed -i '14i /opt/mysql/server-5.6/bin/ndb_mgmd -f /var/lib/mysql-cluster/config.ini' /etc/rc.local
+         
+         - echo "[mysqld]" >> /etc/my.cnf
+         - echo "ndbcluster" >> /etc/my.cnf
+         - echo "ndb-connectstring=$(ifconfig $(route | grep '^default' | grep -o '[^ ]*$') | grep "inet addr" | cut -d ':' -f 2 | cut -d ' ' -f 1):1186" >> /etc/my.cnf
+         
+         - groupadd mysql
+         - useradd -r -g mysql -s /bin/false mysql
+         - mkdir -p /data/mysql
+         - mkdir /var/lib/mysql-files
+         - chown mysql:mysql /var/lib/mysql-files
+         - chown mysql:mysql /data/mysql
+         
+         - sudo /opt/mysql/server-5.6/scripts/mysql_install_db --user=mysql
+         - cp /opt/mysql/server-5.6/support-files/mysql.server /etc/init.d/mysqld
+         - systemctl enable mysqld.service
+         - systemctl start mysqld
+         - ln -s /opt/mysql/server-5.6/bin/mysql /usr/bin/
+         
+         - echo "value=`cat /root/node_addresses.txt`" >> /root/setup_cluster.sh
+         - echo "arr=\$(echo \$value | tr \",\" \"\n\")" >> /root/setup_cluster.sh
+         - echo "for node in \$arr" >> /root/setup_cluster.sh
+         - echo "do" >> /root/setup_cluster.sh
+         - echo "    sshpass -p 'changeme' scp -o StrictHostKeyChecking=no /root/Manager.txt root@\$node:/root/Manager.txt" >> /root/setup_cluster.sh
+         - echo "    sshpass -p 'changeme' ssh -o StrictHostKeyChecking=no root@\$node 'cat /root/Manager.txt >> /etc/hosts'" >> /root/setup_cluster.sh
+         - echo "    sshpass -p 'changeme' ssh -o StrictHostKeyChecking=no root@\$node '/opt/mysql/server-5.6/bin/ndbd'" >> /root/setup_cluster.sh
+         - echo "done" >> /root/setup_cluster.sh
+         
+         - chmod +x /root/setup_cluster.sh
+         - /root/setup_cluster.sh
+         
+         - mysql -e "CREATE DATABASE drupalDB"
+         - mysql -e "CREATE USER drupaluser@localhost identified by 'vmware'"
+         - mysql -e "GRANT ALL PRIVILEGES ON drupalDB.* to drupaluser@localhost"
+         - mysql -e "FLUSH PRIVILEGES"
+         
+         - curl -sS https://getcomposer.org/installer | sudo php -- --install-dir=/usr/local/bin --filename=composer
+         - sudo -H -u service_user bash -c 'composer global require drush/drush:8.x'
+         - sudo -H -u service_user bash -c 'composer global update'         
+         - export PATH="$PATH:/home/service_user/.composer/vendor/bin"
+         
+         - drush dl drupal-8.5.3 --drupal-project-rename=D8
+         - cd /root/D8
+         - drush site-install -y standard --account-name=${input.drupal_username} --account-pass=changeme --db-url=mysql://drupaluser:vmware@127.0.0.1/drupalDB
+         
+         - rm /var/www/html/index.html
+         - cp -r /root/D8/. /var/www/html/
+         - rm -r /root/D8
+         - a2enmod rewrite
+         
+         - sed -i '14i  <Directory /var/www/html>' /etc/apache2/sites-enabled/000-default.conf
+         - sed -i '15i  Allowoverride All' /etc/apache2/sites-enabled/000-default.conf
+         - sed -i '16i  </Directory>' /etc/apache2/sites-enabled/000-default.conf
+         - chmod a+w /var/www/html/sites/default/files
+         
+         - cd /root
+         - openssl req -new -newkey rsa:4096 -x509 -sha256 -days 365 -nodes -out drupalcertificate.crt -keyout drupalkey.key -subj "/C=US/ST=California/L=PA/O=VMWARE/OU=VMWARE/CN=temporarydrupal.com"
+         - chmod 400 /root/drupalkey.key
+         - mv drupalcertificate.crt /etc/ssl/certs/drupalcertificate.crt && mv drupalkey.key /etc/ssl/private/drupalkey.key
+         
+         - sed -i '14i  ServerName temporarydrupal.com' /etc/apache2/sites-enabled/000-default.conf
+         - sed -i '15i  ServerAlias www.temporarydrupal.com' /etc/apache2/sites-enabled/000-default.conf
+         - sed -i '16i   DocumentRoot /var/www/html' /etc/apache2/sites-enabled/000-default.conf         
+         - sed -i '17i  <Directory /var/www/html>' /etc/apache2/sites-enabled/000-default.conf
+         - sed -i '18i  Options FollowSymLinks' /etc/apache2/sites-enabled/000-default.conf
+         - sed -i '19i  Require all granted' /etc/apache2/sites-enabled/000-default.conf 
+         - sed -i '20i  AllowOverride all' /etc/apache2/sites-enabled/000-default.conf  
+         - sed -i '21i  </Directory>' /etc/apache2/sites-enabled/000-default.conf   
+         - sed -i '22i  ErrorLog /var/log/apache2/error.log' /etc/apache2/sites-enabled/000-default.conf 
+         - sed -i '23i  CustomLog /var/log/apache2/access.log combined' /etc/apache2/sites-enabled/000-default.conf
+         
+         - echo "<VirtualHost *:443>" >> /etc/apache2/sites-enabled/000-default.conf
+         - echo "SSLEngine On" >> /etc/apache2/sites-enabled/000-default.conf
+         - echo "SSLCertificateFile /etc/ssl/certs/drupalcertificate.crt" >> /etc/apache2/sites-enabled/000-default.conf
+         - echo "SSLCertificateKeyFile /etc/ssl/private/drupalkey.key" >> /etc/apache2/sites-enabled/000-default.conf
+         - echo "SSLCACertificateFile /etc/ssl/certs/ca-certificates.crt" >> /etc/apache2/sites-enabled/000-default.conf
+         - echo "ServerName temporarydrupal.com" >> /etc/apache2/sites-enabled/000-default.conf
+         - echo "ServerAlias www.temporarydrupal.com" >> /etc/apache2/sites-enabled/000-default.conf
+         - echo "DocumentRoot /var/www/html" >> /etc/apache2/sites-enabled/000-default.conf         
+         - echo "<Directory /var/www/html>" >> /etc/apache2/sites-enabled/000-default.conf
+         - echo "Options FollowSymLinks" >> /etc/apache2/sites-enabled/000-default.conf
+         - echo "Require all granted" >> /etc/apache2/sites-enabled/000-default.conf 
+         - echo "AllowOverride all" >>/etc/apache2/sites-enabled/000-default.conf  
+         - echo "</Directory>" >> /etc/apache2/sites-enabled/000-default.conf   
+         - echo "ErrorLog /var/log/apache2/error.log" >> /etc/apache2/sites-enabled/000-default.conf 
+         - echo "CustomLog /var/log/apache2/access.log combined" >> /etc/apache2/sites-enabled/000-default.conf
+         - echo "</VirtualHost>" >> /etc/apache2/sites-enabled/000-default.conf
+         
+         - echo '#!/bin/sh' > tempshell.sh
+         - echo "sudo sed -i '/<Directory \/var\/www\//,/AllowOverride None/ {" >> tempshell.sh
+         - echo "s/None/all/g" >> tempshell.sh
+         - echo "}' /etc/apache2/apache2.conf" >>tempshell.sh
+         - chmod 755 tempshell.sh 
+         - sh tempshell.sh
+         - a2enmod ssl
+         - systemctl restart apache2
+         
+         - echo "\$settings['trusted_host_patterns'] = [ '.*' ];" >> /var/www/html/sites/default/settings.php
+         - service apache2 restart
+      networks:
+        - name: '${Drupal_Network.name}'
+  Drupal_Network:
+    type: Cloud.Network
+    properties:
+      name: Drupal_Network
+      networkType: existing
+      constraints:
+        - tag: '${input.network}:soft'

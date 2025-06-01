@@ -1,0 +1,129 @@
+formatVersion: 1
+name: GitLab Community Edition
+version: 1
+description: Installs GitLab Community Edition on Ubuntu and CentOS
+inputs:
+  region:
+    type: string
+    description: Region
+    title: Region Tag Name
+    default: ENTER-REGION-TAG
+  image:
+    type: string
+    enum:
+      - ubuntu1604
+      - centOS
+    description: Image/OS required
+    title: Image/OS
+    default: ubuntu1604
+  flavor:
+    type: string
+    enum:
+      - small
+      - medium
+    description: Size of Nodes
+    title: Node Size
+    default: small
+  network:
+    type: string
+    title: Network Tag
+    description: Tag assigned to the subnet in Network Profiles
+    default: ENTER-NETWORK-TAG
+  key:
+    type: string
+    title: Public Key
+    description: Input Public Key outputted from the script
+    default: ENTER-PUBLIC-KEY  
+resources:
+  GitLab CE:
+    type: Cloud.Machine
+    properties:
+      name: GitLab-CE
+      flavor: '${input.flavor}'
+      image: '${input.image}'
+      cloudConfig: |
+        #cloudconfig
+        repo_update: true
+        repo_upgrade: all
+        package_update: true
+        package_upgrade: all
+
+        runcmd:
+         - echo "${input.key}" >> /root/.ssh/authorized_keys
+
+         - echo 'Setting hostname'
+         - FILE="/root/checkHostName.sh"
+         - /bin/cat <<EOM >$FILE
+         - if [ "`cat /etc/os-release | head -1 | cut -d'=' -f 2 | cut -d '"' -f 2`" == "Ubuntu" ]
+         - then
+         - apt-get install libaio1
+         - else
+         - yum -y install bind
+         - yum -y install bind-utils
+         - fi
+         - node_ip=\`host myip.opendns.com resolver1.opendns.com | grep "myip.opendns.com has" | awk '{print \$4}'\`
+         - if [ \$node_ip ]
+         - then
+         - echo \$node_ip > /root/privateOrpublic.txt
+         - else
+         - echo \$node_ip > /root/privateOrpublic.txt
+         - if [ "`cat /etc/os-release | head -1 | cut -d'=' -f 2 | cut -d '"' -f 2`" == "Ubuntu" ]
+         - then
+         - node_ip=\`ifconfig \$(route | grep '^default' | grep -o '[^ ]*\$') | grep 'inet addr' | cut -d ':' -f 2 | cut -d ' ' -f 1\`
+         - else
+         - node_ip=\`ifconfig \$(route | grep '^default' | grep -o '[^ ]*\$') | grep 'inet ' | cut -d ' ' -f 10\`
+         - fi
+         - ip=\`dig -x \$node_ip +short\`
+         - host_name=\$(basename \$ip .)
+         - echo \$host_name > /etc/hostname
+         - hostnamectl set-hostname \$host_name
+         - fi
+         - EOM
+
+         - chmod +x /root/checkHostName.sh
+         - sudo bash /root/checkHostName.sh
+         - rm /root/checkHostName.sh
+
+         - echo '#!/bin/sh' > /root/config.sh
+         - echo "if [[ \`cat /etc/os-release | head -1 | cut -d'=' -f 2 | cut -d '\"' -f 2\` != *\"CentOS Linux\"* ]]; then" >> /root/config.sh
+         - echo "ubuntu_ip=`ifconfig $(route | grep '^default' | grep -o '[^ ]*$') | grep 'inet addr' | cut -d ':' -f 2 | cut -d ' ' -f 1`" >> /root/config.sh
+         - echo 'name=`dig -x $ubuntu_ip +short` && host=$(echo -n $s | head -c -1) && echo "postfix postfix/mailname string $host" | debconf-set-selections' >> /root/config.sh
+         - echo 'fi' >> /root/config.sh
+
+         - FILE="/root/install_gitlabce.sh"
+         - /bin/cat <<EOM >$FILE
+         - if [[ \`cat /etc/os-release | head -1 | cut -d'=' -f 2 | cut -d '"' -f 2\` == *"CentOS Linux"* ]]; then
+         - sudo yum install -y curl policycoreutils-python openssh-server openssh-clients
+         - yum install -y epel-release && yum install -y ufw && sudo ufw --force enable
+         - sudo ufw allow http && sudo ufw allow https
+         - sudo yum install postfix && sudo systemctl enable postfix && sudo systemctl start postfix
+         - curl -sS https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.rpm.sh | sudo bash
+         - centos_ip=`ifconfig $(route | grep '^default' | grep -o '[^ ]*$') | grep 'inet ' | sed -e 's/^ *//g;s/ *$//g' | cut -d ' ' -f 2`
+         - sudo EXTERNAL_URL='http://'"\$centos_ip"'' yum install -y gitlab-ce
+         - else
+         - ubuntu_ip=`ifconfig $(route | grep '^default' | grep -o '[^ ]*$') | grep 'inet addr' | cut -d ':' -f 2 | cut -d ' ' -f 1`
+         - echo "postfix postfix/main_mailer_type string 'Internet Site'" | debconf-set-selections
+         - sudo apt-get install -y curl openssh-server ca-certificates postfix && cd /root
+         - sudo ufw --force enable && sudo ufw allow http && sudo ufw allow https && sudo ufw allow OpenSSH
+         - curl -sS https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh | sudo bash
+         - sudo apt-get install gitlab-ce
+         - sed -i "/.*external_url 'http.*/ c\external_url 'http://\$ubuntu_ip'" /etc/gitlab/gitlab.rb
+         - sudo gitlab-ctl reconfigure
+         - fi
+         - EOM
+
+         - chmod +x /root/install_gitlabce.sh /root/config.sh
+         - sudo bash /root/config.sh
+         - sudo bash /root/install_gitlabce.sh
+      networks:
+        - name: '${resource.GitlabCENetwork.name}'
+      constraints:
+        - tag: '${input.region}'
+  GitlabCENetwork:
+    type: Cloud.Network
+    properties:
+      name: GitlabCENetwork
+      networkType: existing
+      constraints:
+        - tag: '${input.network}'
+

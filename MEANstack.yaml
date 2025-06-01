@@ -1,0 +1,142 @@
+formatVersion: 1
+name: meanstack-machine
+version: 1
+description: Installs node on Ubuntu and CentOS
+inputs:
+  region:
+    type: string
+    description: Region
+    title: Region Tag Name
+    default: ENTER-REGION-TAG-NAME
+  image:
+    type: string
+    enum:
+      - ubuntu1604
+      - CentOS7
+    description: Image/OS required
+    title: Image/OS
+    default: ubuntu1604
+  flavor:
+    type: string
+    enum:
+      - small
+      - medium
+    description: Size of Nodes
+    title: Node Size
+    default: small
+  network:
+    type: string
+    title: Network Tag
+    description: Tag assigned to the subnet in Network Profiles
+    default: ENTER-NETWORK-TAG-NAME
+  key:
+    type: string
+    title: Public Key
+    description: Input Public Key outputted from the script
+    default: ENTER-PUBLIC-KEY
+resources:
+  MeanStack:
+    type: Cloud.Machine
+    properties:
+      name: MeanStack
+      flavor: '${input.flavor}'
+      image: '${input.image}'
+      cloudConfig: |
+        #cloudconfig
+        repo_update: true
+        repo_upgrade: all
+        package_update: true
+        package_upgrade: all
+
+        packages:
+         - wget
+         - deb
+
+        runcmd:
+         -  echo "${input.key}" >> /root/.ssh/authorized_keys
+         
+         - FILE="/root/checkHostName.sh"
+         - /bin/cat <<EOM >$FILE
+         - if [[ \`cat /etc/os-release | head -1 | cut -d'=' -f 2 | cut -d '"' -f 2\` == *"CentOS Linux"* ]]; then
+         - yum install -y bind-utils
+         - fi
+         - node_ip=\`host myip.opendns.com resolver1.opendns.com | grep "myip.opendns.com has" | awk '{print \$4}'\`;
+         - if [ \$node_ip ]; then
+            echo \$node_ip > /root/privateOrpublic.txt;
+           else
+            echo \$node_ip > /root/privateOrpublic.txt;
+            node_ip=\`ifconfig \$(route | grep '^default' | grep -o '[^ ]*\$') | grep 'inet addr' | cut -d ':' -f 2 | cut -d ' ' -f 1\`;
+            ip=\`dig -x \$node_ip +short\`;
+            host_name=\$(basename \$ip .);
+            echo \$host_name > /etc/hostname;
+            cat /etc/hostname;
+            hostnamectl set-hostname \$host_name;
+            hostname;
+            echo \$node_ip \$host_name >> /etc/hosts;
+           fi
+         - EOM
+         
+         - chmod +x /root/checkHostName.sh
+         - sudo /root/checkHostName.sh         
+         
+         - mkdir -p /etc/yum.repos.d
+         - FILE="/etc/yum.repos.d/mongodb-org-4.0.repo"
+         - touch $FILE 
+         - echo "[mongodb-org-4.0]" >> $FILE
+         - echo "name=MongoDB Repository" >> $FILE
+         - echo "baseurl=https://repo.mongodb.org/yum/redhat/\$releasever/mongodb-org/4.0/x86_64/" >> $FILE
+         - echo "gpgcheck=1" >> $FILE
+         - echo "enabled=1" >> $FILE
+         - echo "gpgkey=https://www.mongodb.org/static/pgp/server-4.0.asc" >> $FILE
+         
+         - FILE="/root/install_meanStack.sh"
+         - /bin/cat <<EOM >$FILE 
+         - if [[ \`cat /etc/os-release | head -1 | cut -d'=' -f 2 | cut -d '"' -f 2\` == *"CentOS Linux"* ]]; then
+         - yum install -y vim
+         - yum install -y mongodb-org
+         - echo "exclude=mongodb-org,mongodb-org-server,mongodb-org-shell,mongodb-org-mongos,mongodb-org-tools" >> /etc/yum.conf
+         - semanage port -a -t mongod_port_t -p tcp 27017
+         - sudo service mongod start
+         - curl -sL https://rpm.nodesource.com/setup_8.x | sudo bash -
+         - yum -y install nodejs
+         - yum -y install git
+         - else
+         - apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 9DA31620334BD75D9DCB49F368818C72E52529D4
+         - echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu xenial/mongodb-org/4.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-4.0.list
+         - apt-get update
+         - sudo apt-get install -y mongodb-org
+         - echo "mongodb-org hold" | sudo dpkg --set-selections
+         - echo "mongodb-org-server hold" | sudo dpkg --set-selections
+         - echo "mongodb-org-shell hold" | sudo dpkg --set-selections
+         - echo "mongodb-org-mongos hold" | sudo dpkg --set-selections
+         - echo "mongodb-org-tools hold" | sudo dpkg --set-selections
+         - service mongod start
+         - curl -sL https://deb.nodesource.com/setup_8.x | sudo -E bash -
+         - apt-get -y install nodejs
+         - apt-get -y install git
+         - fi
+         - EOM
+
+         - chmod +x /root/install_meanStack.sh
+         - sudo /root/install_meanStack.sh
+         
+         - npm install -g yarn
+         - npm install -g gulp
+         
+         - git clone https://github.com/meanjs/mean.git /root/mean/
+         - cd /root/mean
+         - npm install
+         - yarn install --allow-root
+         
+      networks:
+        - name: '${resource.MeanStackNetwork.name}'
+      constraints:
+        - tag: '${input.region}'
+  MeanStackNetwork:
+    type: Cloud.Network
+    properties:
+      name: MeanStackNetwork
+      networkType: existing
+      constraints:
+        - tag: '${input.network}'
+

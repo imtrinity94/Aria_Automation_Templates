@@ -1,0 +1,122 @@
+name: NSX-T
+description: Description
+inputs:
+  image:
+    type: string
+    enum:
+      - ubuntu1604
+    description: Image/OS required
+    title: Image/OS
+    default: ubuntu1604
+  flavor:
+    type: string
+    enum:
+      - small
+      - medium
+    description: Size of Nodes
+    title: Node Size
+    default: small
+resources:
+  Cloud_LoadBalancer_1:
+    type: Cloud.LoadBalancer
+    properties:
+      name: 'cloud_loadbalancer_1'
+      routes:
+        - protocol: HTTP
+          port: '80'
+          instanceProtocol: HTTP
+          instancePort: '80'
+          healthCheckConfiguration:
+            protocol: HTTP
+            port: '80'
+            urlPath: /index.html
+            intervalSeconds: 6
+            timeoutSeconds: 5
+            unhealthyThreshold: 2
+            healthyThreshold: 2
+      internetFacing: true
+      network: '${ext_net.name}'
+      instances:
+        - '${Web_App.id}'
+  Web_App:
+    type: Cloud.Machine
+    properties:
+      flavor: small
+      image: ubuntu1604
+      count: 2
+      cloudConfig: |
+        #cloud-config
+        hostname: wordpress-web
+        chpasswd:
+          list: |
+            ubuntu:VMware1!
+          expire: False
+        users:
+          - name: ubuntu
+            passwd: "$1$Lg35t2vk$MIw6mB5VSuZsztttRGlJe0"
+            lock-passwd: False
+            groups: sudo
+            shell: /bin/bash
+            sudo: ['ALL=(ALL) NOPASSWD:ALL']
+        repo_update: true
+        repo_upgrade: all
+        packages:
+          - apache2
+          - php
+          - php-mysql
+          - libapache2-mod-php
+          - php-mcrypt
+          - mysql-client
+        runcmd:
+          - touch /etc/network/interfaces.d/ens33.cfg
+          - echo 'auto ens33 \r\niface ens33 inet dhcp' >> /etc/network/interfaces.d/ens33.cfg
+          - /sbin/ifup ens33
+          - route add default gw 192.168.209.1 ens33
+          - mkdir -p /var/www/html/mywordpresssite && cd /var/www/html && wget https://wordpress.org/latest.tar.gz && tar -xzf /var/www/html/latest.tar.gz -C /var/www/html/mywordpresssite --strip-components 1
+          - for i in {1..5}; do mysql --connect-timeout=3 -h ${mysql.address} -u root -pmysqlpassword -e "SHOW STATUS;" && break || sleep 15; done
+          - mysql -u root -pmysqlpassword -h ${mysql.address} -e "create database wordpress_blog;"
+          - mv /var/www/html/mywordpresssite/wp-config-sample.php /var/www/html/mywordpresssite/wp-config.php
+          - sed -i -e s/"define('DB_NAME', 'database_name_here');"/"define('DB_NAME', 'wordpress_blog');"/ /var/www/html/mywordpresssite/wp-config.php && sed -i -e s/"define('DB_USER', 'username_here');"/"define('DB_USER', 'root');"/ /var/www/html/mywordpresssite/wp-config.php && sed -i -e s/"define('DB_PASSWORD', 'password_here');"/"define('DB_PASSWORD', 'mysqlpassword');"/ /var/www/html/mywordpresssite/wp-config.php && sed -i -e s/"define('DB_HOST', 'localhost');"/"define('DB_HOST', '${mysql.address}');"/ /var/www/html/mywordpresssite/wp-config.php
+          - service apache2 reload
+      networks:
+        - name: '${int_net.name}'
+  mysql:
+    type: Cloud.Machine
+    properties:
+      flavor: small
+      image: ubuntu1604
+      cloudConfig: |
+        #cloud-config
+        hostname: wordpress-mysql.sqa.local
+        users:
+          - name: ubuntu
+            passwd: "$1$Lg35t2vk$MIw6mB5VSuZsztttRGlJe0"
+            lock-passwd: False
+            groups: sudo
+            shell: /bin/bash
+            sudo: ['ALL=(ALL) NOPASSWD:ALL']
+        chpasswd:
+          list: |
+            ubuntu:VMware1!
+          expire: False
+        repo_update: true
+        repo_upgrade: all
+        packages:
+         - mysql-server
+        runcmd:
+         - sed -e '/bind-address/ s/^#*/#/' -i /etc/mysql/mysql.conf.d/mysqld.cnf
+         - service mysql restart
+         - mysql -e "GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY 'mysqlpassword';"
+         - mysql -e "FLUSH PRIVILEGES;"
+      networks:
+        - name: '${int_net.name}'
+  int_net:
+    type: Cloud.Network
+    properties:
+      name: int_net
+      networkType: outbound
+  ext_net:
+    type: Cloud.Network
+    properties:
+      name: ext_net
+      networkType: public

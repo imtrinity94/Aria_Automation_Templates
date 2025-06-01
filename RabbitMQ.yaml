@@ -1,0 +1,350 @@
+formatVersion: 1
+name: rabbit-mq
+version: 1
+description: Installs single- and multi-tier RabbitMQ on Ubuntu
+inputs:
+  region:
+    type: string
+    description: Region
+    title: Region Tag Name
+    default: ENTER-REGION-TAG-NAME
+  image:
+    type: string
+    enum:
+      - ubuntu1604
+    description: Image/OS required
+    title: Image/OS
+    default: ubuntu1604
+  flavor:
+    type: string
+    enum:
+      - small
+      - medium
+    description: Size of Nodes
+    title: Node Size
+    default: small
+  slaves:
+    type: integer
+    description: Additional nodes
+    title: Additional nodes (slaves)
+    default: 1
+  network:
+    type: string
+    title: Network Tag
+    description: Tag assigned to the subnet in Network Profiles
+    default: ENTER-NETWORK-TAG-NAME
+  key:
+    type: string
+    title: Public Key
+    description: Input Public Key outputted from the script
+    default: ENTER-PUBLIC-KEY
+resources:
+  Rabbit-Master:
+    type: Cloud.Machine
+    properties:
+      name: rabbit-master
+      flavor: '${input.flavor}'
+      image: '${input.image}'
+      cloudConfig: |
+        #cloudconfig
+        repo_update: true
+        repo_upgrade: all
+        package_update: true
+        package_upgrade: all
+
+        packages:
+         - wget
+         - deb
+
+        runcmd:
+         - echo root:changeme|sudo chpasswd
+         - sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g'  /etc/ssh/sshd_config
+         - sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/g'  /etc/ssh/sshd_config
+         - systemctl restart sshd
+         - echo "${input.key}" >> /root/.ssh/authorized_keys
+
+         - FILE="/root/checkHostName.sh"
+         - /bin/cat <<EOM >$FILE
+         - if [[ \`cat /etc/os-release | head -1 | cut -d'=' -f 2 | cut -d '"' -f 2\` == *"CentOS Linux"* ]]; then
+         - yum install -y bind-utils
+         - fi
+         - node_ip=\`host myip.opendns.com resolver1.opendns.com | grep "myip.opendns.com has" | awk '{print \$4}'\`;
+         - if [ \$node_ip ]; then
+            echo \$node_ip > /root/privateOrpublic.txt;
+           else
+            echo \$node_ip > /root/privateOrpublic.txt;
+            node_ip=\`ifconfig \$(route | grep '^default' | grep -o '[^ ]*\$') | grep 'inet addr' | cut -d ':' -f 2 | cut -d ' ' -f 1\`;
+            ip=\`dig -x \$node_ip +short\`;
+            host_name=\$(basename \$ip .);
+            echo \$host_name > /etc/hostname;
+            cat /etc/hostname;
+            hostnamectl set-hostname \$host_name;
+            hostname;
+            echo \$node_ip \$host_name >> /etc/hosts;
+           fi
+         - EOM
+         
+         - chmod +x /root/checkHostName.sh
+         - sudo bash /root/checkHostName.sh
+         - rm /root/checkHostName.sh
+         - rm /root/privateOrpublic.txt
+         
+         - hostname | cut -d'.' -f1 > /root/.master_hostname
+         
+         - wget -O - "https://github.com/rabbitmq/signing-keys/releases/download/2.0/rabbitmq-release-signing-key.asc" | sudo apt-key add -
+         - echo "deb https://dl.bintray.com/rabbitmq/debian xenial main erlang-21.x" | sudo tee /etc/apt/sources.list.d/bintray.rabbitmq.list
+         - sudo apt-get update
+         - sed -i 's/# es_US.UTF-8 UTF-8/es_US.UTF-8 UTF-8/g' /etc/locale.gen
+         - echo "export LC_CTYPE=en_US.UTF-8" >> /root/.bashrc
+         - echo "export LC_ALL=en_US.UTF-8" >> /root/.bashrc 
+         - export LC_CTYPE=en_US.UTF-8 
+         - export LC_ALL=en_US.UTF-8
+         - sudo apt-get install -y rabbitmq-server
+         - wget https://github.com/rabbitmq/rabbitmq-server/releases/download/v3.7.8/rabbitmq-server_3.7.8-1_all.deb
+         - dpkg -i rabbitmq-server_3.7.8-1_all.deb
+         - service rabbitmq-server start
+         - ulimit -S -n 4096
+         - rabbitmqctl add_user admin changeme
+         - rabbitmqctl set_user_tags admin administrator
+         - rabbitmqctl set_permissions -p / admin ".*" ".*" ".*"
+         - sudo rabbitmq-plugins enable rabbitmq_management
+         - exec $SHELL
+         
+         - FILE="/root/start_ha.sh"
+         - /bin/cat <<EOM >$FILE          
+         - rabbitmqctl set_policy high-avail ".*" '{"ha-mode":"exactly","ha-params":$(( (${input.slaves}+1)/2 + 1 )),"ha-sync-mode":"automatic"}'
+         - EOM
+         
+         - chmod +x /root/start_ha.sh
+         - sudo bash /root/start_ha.sh
+         
+         - sudo apt-get install -y python-pika
+
+         - FILE="/root/send.py"
+         - /bin/cat <<EOM >$FILE 
+         - import pika
+         - connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+         - channel = connection.channel()
+         - channel.queue_declare(queue='hello')
+         - channel.basic_publish(exchange='', routing_key='hello', body='Hello World!')
+         - print(" [x] Sent 'Hello World!'")
+         - connection.close()
+         - EOM
+         
+         - chmod +x /root/send.py
+         
+         - FILE="/root/receive.py"
+         - /bin/cat <<EOM >$FILE
+         - import pika
+         - connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
+         - channel = connection.channel()
+         - channel.queue_declare(queue='hello')
+         - 'def callback(ch, method, properties, body):'
+         - '    print(" [x] Received %r" % body)'
+         - channel.basic_consume(callback, queue='hello', no_ack=True)
+         - print('[*] Waiting for messages. To exit press CTRL+C')
+         - channel.start_consuming()
+         - EOM
+         
+         - chmod +x /root/receive.py
+         
+         - FILE="/root/stop_ha.sh"
+         - /bin/cat <<EOM >$FILE 
+         - sudo rabbitmqctl clear_policy high-avail
+         - EOM
+         
+         - chmod +x /root/stop_ha.sh
+
+         - FILE="/usr/bin/erlang_version"
+         - /bin/cat <<EOM >$FILE
+         - erl -eval '{ok, Version} = file:read_file(filename:join([code:root_dir(), "releases", erlang:system_info(otp_release), "OTP_VERSION"])), io:fwrite(Version), halt().' -noshell
+         - EOM
+
+         - sed -i 's/&#36;/$/g' /usr/bin/erlang_version
+         - chmod +x /usr/bin/erlang_version
+         
+         - FILE="/root/stop_clustering.sh"
+         - /bin/cat <<EOM >$FILE
+         - sudo rabbitmqctl stop_app
+         - sudo rabbitmqctl reset
+         - sudo rabbitmqctl start_app
+         - rabbitmqctl add_user admin changeme
+         - rabbitmqctl set_user_tags admin administrator
+         - rabbitmqctl set_permissions -p / admin ".*" ".*" ".*"
+         - EOM
+         
+         - chmod +x /root/stop_clustering.sh
+         
+         - sleep 360
+         - sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/g'  /etc/ssh/sshd_config
+         - sed -i 's/PermitRootLogin yes/PermitRootLogin prohibit-password/g'  /etc/ssh/sshd_config
+         - systemctl restart sshd
+         
+      networks:
+        - name: '${resource.RabbitNetwork.name}'
+      constraints:
+        - tag: '${input.region}'
+  Rabbit-Slave:
+    type: Cloud.Machine
+    properties:
+      name: rabbit-slave
+      flavor: '${input.flavor}'
+      image: '${input.image}'
+      count: '${input.slaves}'
+      cloudConfig: |
+        #cloudconfig
+        repo_update: true
+        repo_upgrade: all
+        package_update: true
+        package_upgrade: all
+
+        packages:
+         - wget
+         - deb
+
+        runcmd:
+         - echo root:changeme|sudo chpasswd
+         - sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g'  /etc/ssh/sshd_config
+         - sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/g'  /etc/ssh/sshd_config
+         - systemctl restart sshd
+         - echo "${input.key}" >> /root/.ssh/authorized_keys
+
+         - FILE="/root/checkHostName.sh"
+         - /bin/cat <<EOM >$FILE
+         - if [[ \`cat /etc/os-release | head -1 | cut -d'=' -f 2 | cut -d '"' -f 2\` == *"CentOS Linux"* ]]; then
+         - yum install -y bind-utils
+         - fi
+         - node_ip=\`host myip.opendns.com resolver1.opendns.com | grep "myip.opendns.com has" | awk '{print \$4}'\`;
+         - if [ \$node_ip ]; then
+            echo \$node_ip > /root/privateOrpublic.txt;
+           else
+            echo \$node_ip > /root/privateOrpublic.txt;
+            node_ip=\`ifconfig \$(route | grep '^default' | grep -o '[^ ]*\$') | grep 'inet addr' | cut -d ':' -f 2 | cut -d ' ' -f 1\`;
+            ip=\`dig -x \$node_ip +short\`;
+            host_name=\$(basename \$ip .);
+            echo \$host_name > /etc/hostname;
+            cat /etc/hostname;
+            hostnamectl set-hostname \$host_name;
+            hostname;
+            echo \$node_ip \$host_name >> /etc/hosts;
+           fi
+         - EOM
+         
+         - chmod +x /root/checkHostName.sh
+         - sudo bash /root/checkHostName.sh
+         - rm /root/checkHostName.sh
+         - rm /root/privateOrpublic.txt
+         
+         - wget -O - "https://github.com/rabbitmq/signing-keys/releases/download/2.0/rabbitmq-release-signing-key.asc" | sudo apt-key add -
+         - echo "deb https://dl.bintray.com/rabbitmq/debian xenial main erlang-21.x" | sudo tee /etc/apt/sources.list.d/bintray.rabbitmq.list
+         - sudo apt-get update
+         - echo "export LC_CTYPE=en_US.UTF-8" >> /root/.bashrc
+         - echo "export LC_ALL=en_US.UTF-8" >> /root/.bashrc 
+         - export LC_CTYPE=en_US.UTF-8 
+         - export LC_ALL=en_US.UTF-8
+         - sudo apt-get install -y rabbitmq-server
+         - wget https://github.com/rabbitmq/rabbitmq-server/releases/download/v3.7.8/rabbitmq-server_3.7.8-1_all.deb
+         - dpkg -i rabbitmq-server_3.7.8-1_all.deb
+         - service rabbitmq-server start
+         - ulimit -S -n 4096
+         - rabbitmqctl add_user admin changeme
+         - rabbitmqctl set_user_tags admin administrator
+         - rabbitmqctl set_permissions -p / admin ".*" ".*" ".*"
+         - sudo rabbitmq-plugins enable rabbitmq_management
+
+         - FILE="/root/start_clustering.sh"
+         - /bin/cat <<EOM >$FILE
+         - sudo apt-get install -y sshpass
+         - sshpass -p 'changeme' scp -o StrictHostKeyChecking=no root@${resource.Rabbit-Master.address}:/root/.master_hostname /root/
+         - sshpass -p 'changeme' scp -o StrictHostKeyChecking=no root@${resource.Rabbit-Master.address}:/var/lib/rabbitmq/.erlang.cookie /var/lib/rabbitmq/.erlang.cookie
+         - sudo systemctl restart rabbitmq-server
+         - sudo rabbitmqctl stop_app
+         - sudo rabbitmqctl join_cluster rabbit@\`cat /root/.master_hostname\`
+         - sudo rabbitmqctl start_app
+         - EOM
+         
+         - chmod +x /root/start_clustering.sh
+         - sudo bash /root/start_clustering.sh 
+
+         - FILE="/root/start_ha.sh"
+         - /bin/cat <<EOM >$FILE          
+         - rabbitmqctl set_policy high-avail ".*" '{"ha-mode":"exactly","ha-params":$(( (${input.slaves}+1)/2 + 1 )),"ha-sync-mode":"automatic"}'
+         - EOM
+         
+         - chmod +x /root/start_ha.sh
+         - sudo bash /root/start_ha.sh
+
+         - sudo apt-get install -y python-pika
+         
+         - FILE="/root/receive.py"
+         - /bin/cat <<EOM >$FILE
+         - import pika
+         - connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
+         - channel = connection.channel()
+         - channel.queue_declare(queue='hello')
+         - 'def callback(ch, method, properties, body):'
+         - '    print(" [x] Received %r" % body)'
+         - channel.basic_consume(callback, queue='hello', no_ack=True)
+         - print('[*] Waiting for messages. To exit press CTRL+C')
+         - channel.start_consuming()
+         - EOM
+         
+         - chmod +x /root/receive.py
+         
+         - FILE="/usr/bin/erlang_version"
+         - /bin/cat <<EOM >$FILE
+         - erl -eval '{ok, Version} = file:read_file(filename:join([code:root_dir(), "releases", erlang:system_info(otp_release), "OTP_VERSION"])), io:fwrite(Version), halt().' -noshell
+         - EOM
+
+         - sed -i 's/&#36;/$/g' /usr/bin/erlang_version
+         - chmod +x /usr/bin/erlang_version
+         
+         - FILE="/root/stop_clustering.sh"
+         - /bin/cat <<EOM >$FILE
+         - sudo rabbitmqctl stop_app
+         - sudo rabbitmqctl reset
+         - sudo rabbitmqctl start_app
+         - rabbitmqctl add_user admin changeme
+         - rabbitmqctl set_user_tags admin administrator
+         - rabbitmqctl set_permissions -p / admin ".*" ".*" ".*"
+         - EOM
+         
+         - chmod +x /root/stop_clustering.sh
+         
+         - FILE="/root/send.py"
+         - /bin/cat <<EOM >$FILE 
+         - import pika
+         - connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+         - channel = connection.channel()
+         - channel.queue_declare(queue='hello')
+         - channel.basic_publish(exchange='', routing_key='hello', body='Hello World!')
+         - print(" [x] Sent 'Hello World!'")
+         - connection.close()
+         - EOM
+         
+         - chmod +x /root/send.py
+         
+         - FILE="/root/stop_ha.sh"
+         - /bin/cat <<EOM >$FILE 
+         - sudo rabbitmqctl clear_policy high-avail
+         - EOM
+         
+         - chmod +x /root/stop_ha.sh
+         
+         - exec $SHELL
+         - sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/g'  /etc/ssh/sshd_config
+         - sed -i 's/PermitRootLogin yes/PermitRootLogin prohibit-password/g'  /etc/ssh/sshd_config
+         - systemctl restart sshd
+         
+      networks:
+        - name: '${resource.RabbitNetwork.name}'
+      constraints:
+        - tag: '${input.region}'
+  RabbitNetwork:
+    type: Cloud.Network
+    properties:
+      name: RabbitNetwork
+      networkType: existing
+      constraints:
+        - tag: '${input.network}'
+
