@@ -3,11 +3,31 @@ version: 1
 formatVersion: 1
 inputs: {}
 resources:
+  Cloud_Network_1:
+    type: Cloud.Network
+    properties:
+      networkType: existing
   vm-1:
     type: Cloud.vSphere.Machine
     properties:
       name: vm-1
-      cpuCount: 2
-      totalMemoryMB: 4096
-      imageRef: >-
-        https://bintray.com/vmware/photon/download_file?file_path=3.0%2FGA%2Fova%2Fphoton-hw13_uefi-3.0-26156e2.ova
+      # cpuCount: 2
+      # totalMemoryMB: 4096
+      flavor: medium
+      imageRef: https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.ova
+      cloudConfig: |
+        #cloud-config
+         users:
+           - name: myuser
+             groups: sudo
+             shell: /bin/bash
+             sudo: ALL=(ALL) NOPASSWD:ALL
+             lock_passwd: false
+         
+         chpasswd:
+           list: |
+             myuser:VMware1!
+           expire: false
+      networks:
+        - network: ${resource.Cloud_Network_1.id}
+          assignment: static
