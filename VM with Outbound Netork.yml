@@ -1,0 +1,28 @@
+# https://www.soeldner-consult.de/en/vrealize-automation-network-profiles-outbound/
+formatVersion: 1
+inputs:
+  name:
+    type: string
+    title: VM Name
+    description: Name of the virtual machine
+resources:
+  Cloud_Machine_1:
+    type: Cloud.Machine
+    properties:
+      flavor: small
+      image: Ubuntu1804
+      cloudConfig: |
+        #cloudconfig
+        repo_update: true
+        repo_upgrade: all
+        package_update: true
+        package_upgrade: all
+        hostname: ${input.name}
+        manage_etc_hosts: true
+      networks:
+        - network: '${resource.Cloud_NSX_Network_1.id}'
+      name: Ubuntu
+  Cloud_NSX_Network_1:
+    type: Cloud.NSX.Network
+    properties:
+      networkType: outbound
