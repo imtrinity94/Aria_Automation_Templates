@@ -1,0 +1,65 @@
+
+formatVersion: 1
+inputs:
+  namespace:
+    type: string
+    title: Namespace
+    $data: /data/namespaces
+  storageClass:
+    type: string
+    title: Storage Class
+    $data: /data/storageclasses?namespace={{namespace}}
+  vm_size:
+    type: string
+    title: Virtual Machine Size
+    description: Select the Virtual Machine Size
+    $data: /data/virtualmachineclasses?namespace={{namespace}}
+    default: best-effort-medium
+  vm_image:
+    type: string
+    title: Virtual Machine Image
+    description: Select Virtual Machine Image
+    oneOf:
+      - title: Ubuntu 24.04
+        const: ubuntu-24.04-lts-noble-server-cloudimg-amd64
+      - title: Windows Server 2022
+        const: windows-server-2022
+    default: ubuntu-24.04-lts-noble-server-cloudimg-amd64
+  drPolicy:
+    type: boolean
+    title: Deploy to Diaster Recovery host?
+    description: Apply the dr tag to place the vm on a dr host.
+    default: true
+  oraclePolicy:
+    type: boolean
+    title: Deploy to an Oracle licensed host?
+    description: Apply the oracle tag to place the vm on a Oracle licensed host.
+    default: false
+resources:
+  CCI_Supervisor_Namespace_1:
+    type: CCI.Supervisor.Namespace
+    properties:
+      name: ${input.namespace}
+      existing: true
+  Virtual_Machine_1:
+    type: CCI.Supervisor.Resource
+    properties:
+      context: ${resource.CCI_Supervisor_Namespace_1.id}
+      manifest:
+        apiVersion: vmoperator.vmware.com/v1alpha5
+        kind: VirtualMachine
+        metadata:
+          name: ${env.deploymentName}
+        spec:
+          className: ${input.vm_size}
+          imageName: ${input.vm_image}
+          powerState: PoweredOn
+          storageClass: ${input.storageClass}
+          policies: '${(input.drPolicy || input.oraclePolicy) ? [ (input.drPolicy ? {"apiVersion":"://vsphere.policy.vmware.com","kind":"ComputePolicy","name":"disaster-recovery"} : null), (input.oraclePolicy ? {"apiVersion":"://vsphere.policy.vmware.com","kind":"ComputePolicy","name":"oracle"} : null) ] : null}'
+          #policies:
+           # - '${input.drPolicy ? {"apiVersion":"vsphere.policy.vmware.com/v1alpha1","kind":"ComputePolicy","name":"disaster-recovery"} : null}'
+            #- '${input.oraclePolicy ? {"apiVersion":"vsphere.policy.vmware.com/v1alpha1","kind":"ComputePolicy","name":"oracle"} : null}'
+      wait:
+        conditions:
+          - type: VirtualMachineCreated
+            status: 'True'
