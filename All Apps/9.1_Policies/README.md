@@ -1,125 +1,58 @@
-# 🏷️ VCF Automation 9.1 – Infrastructure Policies
-
-> **New in VCF Automation 9.1** · Provider Management Feature
+# VCF Automation 9.1 – Infrastructure Policies
 
 ## Overview
 
-**Infrastructure Policies** are a powerful new capability introduced in **VMware Cloud Foundation (VCF) Automation 9.1**. They bridge vSphere Compute Policies with VCF Automation's placement engine, enabling administrators to define intelligent, tag- and criteria-driven **workload placement rules** without requiring manual intervention at deployment time.
+**Infrastructure Policies** are a new feature in VCF Automation 9.1 that allow workloads to be placed on specific compute hosts by linking a **vCenter Compute Policy** to a deployment. Policies are applied conditionally using **Policy Enforcement Criteria** based on Guest OS, OS Family, or Labels.
 
-Think of an Infrastructure Policy as a **smart placement tag** — when a workload matches defined criteria (OS type, labels, etc.), VCF Automation automatically places it on the compute resources governed by the linked vCenter Compute Policy.
-
----
-
-## 🆕 What's New in 9.1
-
-| Capability | Description |
-|---|---|
-| **Infrastructure Policies** | New policy object in Provider Management for tag-based workload placement |
-| **vCenter Compute Policy Binding** | Directly maps a VCF policy to a vSphere Compute Policy (e.g., HA groups, VM-Host affinity) |
-| **Policy Enforcement Criteria** | Rules engine using Guest OS, OS Family, and Labels to conditionally apply policies |
-| **Mandatory Policy Flag** | Option to enforce a policy as mandatory across an entire region/organisation |
-| **Label-Based Targeting** | Workloads carrying specific VCF labels are automatically subject to matching policies |
+This template demonstrates how to use boolean inputs (`drPolicy`, `oraclePolicy`) to dynamically apply compute policies at deploy time via the `policies` field in a `VirtualMachine` manifest.
 
 ---
 
-## 🖼️ UI Reference
+## UI Reference
 
-The screenshot below shows the **New Infrastructure Policy** form in VCF Automation Provider Management:
+![New Infrastructure Policy – VCF Automation Provider Management](image.png)
 
-![New Infrastructure Policy UI](image.png)
-
-> **Navigation Path:**  
-> `VCF Automation → Provider Management → Infrastructure → Infrastructure Policies → New`
-
-### Form Fields
+**Navigation:** `Provider Management → Infrastructure → Infrastructure Policies → New`
 
 | Field | Description |
 |---|---|
-| **Name** | Unique identifier for the policy (e.g., `disaster-recovery`) |
-| **Description** | Human-readable description of the policy's purpose |
-| **vCenter Compute Policy** | The vSphere Compute Policy to enforce (e.g., VM-Host Affinity rules) |
-| **Mandatory Policy** | When checked, the policy is automatically applied to all workloads in the assigned region |
-| **Policy Enforcement Criteria** | Rule builder to filter which workloads the policy applies to |
+| **Name** | Policy identifier (e.g. `disaster-recovery`) |
+| **Description** | Optional description |
+| **vCenter Compute Policy** | The vSphere Compute Policy to enforce |
+| **Mandatory Policy** | Apply policy to all workloads in the assigned region |
+| **Policy Enforcement Criteria** | Rules to match workloads (e.g. `GuestOS EQUALS "Linux" AND Label[AZ-1] EXISTS`) |
 
 ---
 
-## ⚙️ Policy Enforcement Criteria Syntax
+## Template: `VCFA_9.1_Policies.yaml`
 
-The **Policy Enforcement Criteria** rule builder supports the following operators. Rules are combined with logical `AND`.
+A VCF Automation Cloud Template deploying a `VirtualMachine` on a CCI Supervisor Namespace with optional policy assignment.
 
-```
-GuestOS EQUALS "<OS Name>"            # Target a specific Guest OS
-GuestOSFamily EQUALS "<OS Family>"   # Target a Guest OS family (e.g., "Linux")
-Label[<key>] EXISTS                   # Workload must have this label key
-Label[<key>] EQUALS "<value>"         # Workload label must match a specific value
-```
+### Inputs
 
-### Examples
-
-```
-# All Linux workloads in AZ-1
-GuestOSFamily EQUALS "Linux" AND Label[AZ-1] EXISTS
-
-# Windows workloads tagged for disaster-recovery
-GuestOS EQUALS "Windows Server 2022" AND Label[disaster-recovery] EXISTS
-
-# Any workload needing encryption compliance
-Label[compliance] EXISTS AND Label[encryption-required] EXISTS
-```
-
----
-
-## 📄 YAML Template: `VCFA_9.1_Policies.yaml`
-
-The `VCFA_9.1_Policies.yaml` file in this folder contains **ready-to-reference** Infrastructure Policy definitions. These are documentation-style examples that reflect the options you configure in the UI.
-
-### Policies Included
-
-| Policy Name | Purpose | Mandatory |
+| Input | Type | Description |
 |---|---|---|
-| `disaster-recovery` | Places DR-tagged workloads on HA/DRS-enabled compute | No |
-| `linux-production` | Targets Linux production workloads with dedicated resources | Yes |
-| `secure-encrypted` | Enforces placement on encrypted-datastore-backed compute | No |
+| `namespace` | string | Target Supervisor Namespace |
+| `storageClass` | string | Storage class for the VM |
+| `vm_size` | string | VM size class (default: `best-effort-medium`) |
+| `vm_image` | string | OS image — Ubuntu 24.04 or Windows Server 2022 |
+| `drPolicy` | boolean | Place VM on Disaster Recovery host (default: `true`) |
+| `oraclePolicy` | boolean | Place VM on Oracle licensed host (default: `false`) |
 
----
+### Resources
 
-## 🔄 How It Works: Workload Placement Flow
+- **`CCI.Supervisor.Namespace`** — references an existing namespace
+- **`CCI.Supervisor.Resource`** — deploys a `VirtualMachine` (`vmoperator.vmware.com/v1alpha5`) with:
+  - `className`, `imageName`, `storageClass` driven by inputs
+  - `policies` field dynamically set based on `drPolicy` / `oraclePolicy` booleans, referencing `ComputePolicy` objects (`disaster-recovery`, `oracle`)
 
+### Policy Assignment Logic
+
+```yaml
+policies: '${(input.drPolicy || input.oraclePolicy) ? 
+  [ (input.drPolicy ? {"apiVersion":"...","kind":"ComputePolicy","name":"disaster-recovery"} : null),
+    (input.oraclePolicy ? {"apiVersion":"...","kind":"ComputePolicy","name":"oracle"} : null) 
+  ] : null}'
 ```
-Deploy Request
-     │
-     ▼
-VCF Automation evaluates active Infrastructure Policies
-     │
-     ├── Does the workload match Policy Enforcement Criteria?
-     │        (OS Type, Labels, OS Family)
-     │
-     ├── YES → Apply linked vCenter Compute Policy
-     │              (VM-Host Affinity, DRS Group, etc.)
-     │
-     └── NO  → Standard placement (no policy applied)
-```
 
----
-
-## 🏷️ Label-Based Targeting: Best Practices
-
-To maximise the benefit of Infrastructure Policies, follow these labelling conventions on your VCF Automation catalog items and deployments:
-
-- **Environment labels**: `environment=production`, `environment=dev`, `environment=dr`
-- **Compliance labels**: `compliance=pci`, `compliance=hipaa`, `encryption-required=true`
-- **Availability Zone labels**: `az=az-1`, `az=az-2`
-- **Workload type labels**: `workload-type=gpu`, `workload-type=latency-sensitive`
-
-These labels can be applied via:
-- Cloud Template (`cloudConfig` or `tags` property)
-- Catalog Service custom properties
-- ABX / Orchestrator automation
-
----
-
-## 📚 References
-
-- [VCF Automation 9.1 Release Notes](https://docs.vmware.com/en/VMware-Cloud-Foundation/index.html)
-- [Infrastructure Policies Documentation](https://docs.vmware.com/en/VMware-Cloud-Foundation/index.html)
-- [vSphere Compute Policies](https://docs.vmware.com/en/VMware-vSphere/index.html)
+The `policies` field accepts a list of `ComputePolicy` references. Conditional expressions ensure only the selected policies are applied.
