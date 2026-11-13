@@ -1,0 +1,34 @@
+formatVersion: 1
+inputs:
+  vm-name:
+    type: string
+    title: Enter VM Name
+    default: vm
+  count:
+    type: integer
+    maximum: 5
+    title: Count (<=5)
+resources:
+  CCI_Supervisor_Namespace_1:
+    type: CCI.Supervisor.Namespace
+    properties:
+      name: csd-namespace-01-byp23
+      existing: true
+  CCI_Supervisor_Resource_1:
+    type: CCI.Supervisor.Resource
+    allocatePerInstance: true
+    properties:
+      count: ${input.count}
+      context: ${resource.CCI_Supervisor_Namespace_1.id}
+      manifest:
+        apiVersion: vmoperator.vmware.com/v1alpha3
+        kind: VirtualMachine
+        metadata:
+          name: ${input.vm-name}-${count.index}-${env.shortDeploymentId}
+          labels:
+            vm-selector: ${input.vm-name}-${count.index}-${env.shortDeploymentId}
+        spec:
+          className: best-effort-medium
+          imageName: vmi-f84f523a54e293552
+          powerState: PoweredOn
+          storageClass: csd-dr-vks-policy

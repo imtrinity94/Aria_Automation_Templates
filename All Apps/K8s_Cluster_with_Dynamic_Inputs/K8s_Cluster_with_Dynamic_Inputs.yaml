@@ -1,0 +1,100 @@
+formatVersion: 2
+variables:
+  datastore-policy: csd-dr-vks-policy
+  content-library: cl-aeb0fe241bc6134a7
+inputs:
+  namespace-name:
+    type: string
+    title: Select Namespace
+    description: Provide existing namespace name which is used as deployment target
+    $data: /data/namespaces?projectId={{project}}
+  cluster-name:
+    type: string
+    title: Enter K8s Cluster Name
+  kubernetes-version:
+    type: string
+    title: Select Kubernetes Version
+    description: Kubernetes Version
+    oneOf:
+      - title: v1.33.6---vmware.1-fips-vkr.2
+        const: v1.33.6---vmware.1-fips-vkr.2
+      - title: v1.33.3---vmware.1-fips-vkr.1
+        const: v1.33.3---vmware.1-fips-vkr.1
+  controlPlaneCount:
+    type: integer
+    title: Select VKS ControlPlane Node count
+    description: Control plane node count
+    default: 1
+    oneOf:
+      - title: '1'
+        const: 1
+      - title: '3'
+        const: 3
+  WorkloadNodeCount:
+    type: integer
+    title: Select VKS Workload Node count
+    description: Workload node count
+    default: 1
+    oneOf:
+      - title: '1'
+        const: 1
+      - title: '3'
+        const: 3
+  VmClass:
+    type: string
+    title: Select VM Class
+    oneOf:
+      - title: best-effort-medium
+        const: best-effort-medium
+      - title: best-effort-large
+        const: best-effort-large
+      - title: best-effort-xlarge
+        const: best-effort-xlarge
+      - title: best-effort-2xlarge
+        const: best-effort-2xlarge
+resources:
+  CCI_Supervisor_Namespace_1:
+    type: CCI.Supervisor.Namespace
+    properties:
+      name: ${input.namespace-name}
+      existing: true
+  Kubernetes_Cluster_1:
+    type: CCI.Supervisor.Resource
+    properties:
+      context: ${resource.CCI_Supervisor_Namespace_1.id}
+      manifest:
+        apiVersion: cluster.x-k8s.io/v1beta1
+        kind: Cluster
+        metadata:
+          name: ${input.cluster-name}
+          namespace: ${resource.CCI_Supervisor_Namespace_1.name}
+        spec:
+          clusterNetwork:
+            pods:
+              cidrBlocks:
+                - 192.168.156.0/20
+            services:
+              cidrBlocks:
+                - 10.96.0.0/12
+            serviceDomain: cluster.local
+          topology:
+            class: builtin-generic-v3.3.0
+            version: ${input.kubernetes-version}
+            variables:
+              - name: vmClass
+                value: ${input.VmClass}
+              - name: storageClass
+                value: ${variable.datastore-policy}
+            controlPlane:
+              replicas: ${input.controlPlaneCount}
+              metadata:
+                annotations:
+                  run.tanzu.vmware.com/resolve-os-image: os-name=photon, content-library=${variable.content-library}
+            workers:
+              machineDeployments:
+                - class: node-pool
+                  name: kubernetes-cluster-9w19-np-4kd5
+                  replicas: ${input.WorkloadNodeCount}
+                  metadata:
+                    annotations:
+                      run.tanzu.vmware.com/resolve-os-image: os-name=photon, content-library=${variable.content-library}

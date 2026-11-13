@@ -1,0 +1,176 @@
+# This blueprint is not meant to be an optimal production blueprint, but rather be a MVP/POC blueprint to showcase some of the capabilities in VCF Automation. To make it work there are some things that can not currently (9.0.2) be fetched dynamically that you need to input.
+# most of these values are under variables: , but you also need to edit the vmi's to correspond to your linux images.
+# for Ubuntu, just download the -cloudimg- images from their ftp since they are cloud-init prepped.
+# All Photon images use cloud-init.
+# password for vmware user is VMware123! currently VCF Automation 9.0.2 lacks a bcrypt() function.
+formatVersion: 2
+outputs:
+  __deploymentOverview:
+    value: |-
+
+      ## VM Service deployment
+
+      Your Virtual Machine was deployed successfully. Below is a table of useful information
+
+      #### Virtual Machines
+      <table class="table">
+        <tr>
+          <th>Name</th>
+          <th>Hostname</th>
+          <th>Domain</th>
+          <th>Status</th>
+          <th>Power State</th>
+          <th>Zone</th>
+          <th>Internal Address</th>
+          <th>Public Address</th>
+          <th>Class</th>
+        </tr>
+        <tr>
+          <td><strong>{{resource.linux_vm.object.metadata.name}}</strong></td>
+          <td>{{resource.linux_vm.object.spec.network.hostName}}</td>
+          <td>{{resource.linux_vm.object.spec.network.domainName}}</td>
+          <td><span class="label label-success">Ready</span></td>
+          <td><span class="label"> {{resource.linux_vm.object.spec.powerState}} </span></td>
+          <td>{{resource.linux_vm.object.status.zone}}</td>
+          <td>{{resource.linux_vm.object.status.network.primaryIP4}}</td>
+          <td>%{if input.expose-ssh == true}${resource.loadbalancer[*].object.status.loadBalancer.ingress[0].ip[0]}%{else}-%{endif}</td>
+          <td><span class="label label-info"> {{resource.linux_vm.object.spec.className}} </span></td>
+        </tr>
+      </table>
+
+      #### SSH
+
+      %{if input.expose-ssh == true}
+          username@${resource.loadbalancer[*].object.status.loadBalancer.ingress[0].ip[0]}
+      %{else}
+          vmware@{{resource.linux_vm.object.status.network.primaryIP4}}
+      %{endif}
+
+      > **Disclaimer**: IP address may still be populating, if it's blank please come back in a minute.
+variables:
+  hostname: ${substring(to_lower(split(env.requestedBy, '.')[0] + '-' + env.shortDeploymentId), 0, 14)}
+  user: ${split(env.requestedBy, '@')[0]}
+  domain: fiscnet.ro
+  timezone: Europe\Bucharest
+  nameserver01: 10.253.9.11
+  nameserver02: 10.253.9.12
+inputs:
+  namespace-name:
+    type: string
+    title: Select Namespace
+    $data: /data/namespaces?projectId={{project}}
+  vm-class:
+    type: string
+    title: Select Virtual Machine Size
+    $data: /data/virtualmachineclasses?namespace={{namespace-name}}
+    default: best-effort-xsmall
+  vm-image:
+    type: string
+    title: Select Virtual Machine Image
+    description: Select a Virtual Machine Image
+    oneOf:
+      - title: Photon-5.0
+        const: vmi-f84f523a54e293552
+  expose-ssh:
+    type: boolean
+    title: Assign public IP
+resources:
+  namespace:
+    type: CCI.Supervisor.Namespace
+    properties:
+      name: ${input.namespace-name}
+      existing: true
+  linux_vm:
+    type: CCI.Supervisor.Resource
+    dependsOn:
+      - secret
+      - loadbalancer
+    properties:
+      context: ${resource.namespace.id}
+      wait:
+        conditions:
+          - type: VirtualMachineCreated
+            status: 'True'
+      manifest:
+        apiVersion: vmoperator.vmware.com/v1alpha3
+        kind: VirtualMachine
+        metadata:
+          name: vm-${variable.hostname}
+          labels:
+            vm-lb-selector: vm-${variable.hostname}
+            vm-selector: vm-${variable.hostname}
+        spec:
+          className: ${input.vm-class}
+          imageName: ${input.vm-image}
+          powerState: PoweredOn
+          storageClass: csd-dr-vks-policy
+          network:
+            hostName: ${variable.hostname}
+            domainName: ${variable.domain}
+            nameservers:
+              - ${variable.nameserver01}
+              - ${variable.nameserver02}
+            searchDomains:
+              - ${variable.hostname}
+          bootstrap:
+            cloudInit:
+              rawCloudConfig:
+                name: vm-${variable.hostname}-bootstrap-secret
+                key: cloud-config
+  loadbalancer:
+    type: CCI.Supervisor.Resource
+    properties:
+      count: ${input.expose-ssh == true ? 1:0}
+      context: ${resource.namespace.id}
+      manifest:
+        apiVersion: vmoperator.vmware.com/v1alpha3
+        kind: VirtualMachineService
+        metadata:
+          name: lb-${variable.hostname}
+          namespace: ${input.namespace-name}
+        spec:
+          selector:
+            vm-lb-selector: vm-${variable.hostname}
+          type: LoadBalancer
+          ports:
+            - name: ssh
+              port: 22
+              protocol: TCP
+              targetPort: 22
+  secret:
+    type: CCI.Supervisor.Resource
+    properties:
+      context: ${resource.namespace.id}
+      manifest:
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: vm-${variable.hostname}-bootstrap-secret
+          labels:
+            vm-selector: vm-${variable.hostname}
+        stringData:
+          cloud-config: |
+            #cloud-config
+            timezone: ${variable.timezone}
+            fqdn: ${variable.hostname}.${variable.domain}
+            ssh_pwauth: true
+            users:
+              - name: root
+                passwd: $1$zDatx20t$Tp6YnKyoNBaHcbXuMtbfM1
+                lock_passwd: false
+                shell: /bin/bash
+              - name: vmware
+                gecos: vmware
+                lock_passwd: false
+                groups: sudo, users, admin
+                shell: /bin/bash
+                sudo: ALL=(ALL) NOPASSWD:ALL
+                passwd: $1$zDatx20t$Tp6YnKyoNBaHcbXuMtbfM1
+            package_upgrade: true
+            package_update: true
+            package_reboot_if_required: true
+            power_state:
+              delay: now
+              mode: reboot
+              message: Rebooting the OS
+              condition: if [ -e /var/run/reboot-required ]; then exit 0; else exit 1; fi

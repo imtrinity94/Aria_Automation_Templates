@@ -1,0 +1,53 @@
+formatVersion: 1
+inputs:
+  clusterName:
+    type: string
+    title: K8s Cluster Name
+    default: k8s-cluster-
+    description: Kubernetes Cluster Name
+resources:
+  CCI_Supervisor_Namespace_1:
+    type: CCI.Supervisor.Namespace
+    properties:
+      name: csd-namespace-01-byp23
+      existing: true
+  Kubernetes_Cluster_1:
+    type: CCI.Supervisor.Resource
+    properties:
+      context: ${resource.CCI_Supervisor_Namespace_1.id}
+      manifest:
+        apiVersion: cluster.x-k8s.io/v1beta1
+        kind: Cluster
+        metadata:
+          name: ${input.clusterName}-${env.shortDeploymentId}
+        spec:
+          clusterNetwork:
+            pods:
+              cidrBlocks:
+                - 192.168.156.0/20
+            services:
+              cidrBlocks:
+                - 10.96.0.0/12
+            serviceDomain: cluster.local
+          topology:
+            class: builtin-generic-v3.4.0
+            classNamespace: vmware-system-vks-public
+            version: v1.33.6---vmware.1-fips-vkr.2
+            variables:
+              - name: vmClass
+                value: best-effort-medium
+              - name: storageClass
+                value: csd-dr-vks-policy
+            controlPlane:
+              replicas: 1
+              metadata:
+                annotations:
+                  run.tanzu.vmware.com/resolve-os-image: os-name=photon, content-library=cl-aeb0fe241bc6134a7
+            workers:
+              machineDeployments:
+                - class: node-pool
+                  name: worker-${env.shortDeploymentId}
+                  replicas: 1
+                  metadata:
+                    annotations:
+                      run.tanzu.vmware.com/resolve-os-image: os-name=photon, content-library=cl-aeb0fe241bc6134a7
