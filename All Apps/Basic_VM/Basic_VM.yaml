@@ -1,0 +1,31 @@
+formatVersion: 1
+inputs:
+  hostname:
+    type: string
+    title: VM Name
+    default: vm-
+    description: Virtual Machine Name
+resources:
+  CCI_Supervisor_Namespace_1:
+    type: CCI.Supervisor.Namespace
+    properties:
+      name: csd-namespace-01-byp23
+      existing: true
+  Virtual_Machine_1:
+    type: CCI.Supervisor.Resource
+    properties:
+      context: ${resource.CCI_Supervisor_Namespace_1.id}
+      manifest:
+        apiVersion: vmoperator.vmware.com/v1alpha3
+        kind: VirtualMachine
+        metadata:
+          name: ${input.hostname}
+        spec:
+          className: best-effort-medium
+          imageName: vmi-f84f523a54e293552
+          powerState: PoweredOn
+          storageClass: csd-dr-vks-policy
+      wait:
+        conditions:
+          - type: VirtualMachineCreated
+            status: 'True'
