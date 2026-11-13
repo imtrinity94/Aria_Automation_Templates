@@ -18,6 +18,10 @@ This is what makes the blueprint special. Any output named **`__deploymentOvervi
 
 ### What the user sees
 
+![Overview tab of a VM Service deployment in VCF Automation](overview-tab.png)
+
+*Overview tab as it appears on the deployment in the VCF Automation UI (example deployment with **Assign public IP** ticked).*
+
 - A **Virtual Machines** table: name, hostname, domain, status, power state, zone, internal IP, public IP and VM class
 - Colour-coded badges – e.g. a green **Ready** status and a blue VM-class label
 - An **SSH** section with the exact login to use: the load balancer IP when *Assign public IP* was ticked, otherwise `vmware@<internal IP>`
