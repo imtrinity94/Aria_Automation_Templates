@@ -2,13 +2,48 @@
 
 ## Overview
 
-A fuller **VM Service** blueprint that shows several VCF Automation features in one template:
+A fuller **VM Service** blueprint that shows several VCF Automation features in one template. Its standout feature is a **custom, live-updating Overview tab** on the deployment page.
 
+- ⭐ **Custom Overview tab** – the `__deploymentOverview` output adds an **Overview** tab to the deployment in the VCF Automation UI, showing the end user a styled summary of their VM and how to connect to it. It **stays up to date** as the deployment changes (see [below](#-the-overview-tab))
 - **Dynamic drop-downs** for the namespace and the VM class
 - An **auto-generated hostname** built from the requesting user's name and the deployment ID
 - **cloud-init** guest customisation (users, password, timezone, FQDN, package updates) passed through a Kubernetes **Secret**
 - An **optional SSH load balancer** (public IP) controlled by a single checkbox
-- A rich **deployment overview** (`__deploymentOverview` output) that shows the VM details and SSH command in the deployment page
+
+---
+
+## ⭐ The Overview tab
+
+This is what makes the blueprint special. Any output named **`__deploymentOverview`** is not shown as a normal output: VCF Automation renders it as a separate **Overview** tab on the deployment, so the end user gets a ready-made "what did I get and how do I use it" page without any custom UI work.
+
+### What the user sees
+
+- A **Virtual Machines** table: name, hostname, domain, status, power state, zone, internal IP, public IP and VM class
+- Colour-coded badges – e.g. a green **Ready** status and a blue VM-class label
+- An **SSH** section with the exact login to use: the load balancer IP when *Assign public IP* was ticked, otherwise `vmware@<internal IP>`
+- A disclaimer that the IP may take a minute to appear
+
+### How it is built
+
+The output `value` is a **Markdown** string, and Markdown can contain **HTML**, so the template mixes both:
+
+| Technique | Example in the template | Purpose |
+|---|---|---|
+| Markdown headings / quotes | `## VM Service deployment`, `> **Disclaimer**` | Page structure |
+| HTML table with UI CSS classes | `<table class="table">` | Table styled like the rest of the VCF Automation UI |
+| Label classes | `<span class="label label-success">`, `label-info` | Coloured status / class badges |
+| Live resource placeholders | `{{resource.linux_vm.object.status.network.primaryIP4}}` | Values read from the deployed Kubernetes object |
+| Template expressions and conditions | `%{if input.expose-ssh == true} … %{else} … %{endif}`, `${resource.loadbalancer[*]…ip[0]}` | Show different content depending on the request inputs |
+
+### Why it updates by itself
+
+The `{{resource.<name>.object.…}}` placeholders point at the **live** VM object (`spec` and `status` of the `VirtualMachine`), not at values copied at request time. So when the deployment changes, the Overview tab reflects it, for example:
+
+- the internal IP appearing once the VM gets an address
+- the power state changing after a power off / on
+- the VM class changing after a resize
+
+Any field of the VM object can be added to the page the same way, so the tab is easy to extend with extra columns or sections.
 
 > As the comments at the top of the YAML say, this is an **MVP / POC blueprint** to showcase capabilities, not a production-ready template. It was written for VCF Automation **9.0.2**, where some values cannot yet be fetched dynamically and must be entered in `variables:`.
 
@@ -57,14 +92,11 @@ The VM carries the label `vm-lb-selector: vm-<hostname>`, which is exactly what 
 
 Default password for `root` and `vmware` is **`VMware123!`** (stored as an MD5-crypt hash, because VCF Automation 9.0.2 has no `bcrypt()` function). **Change it** before using the blueprint anywhere beyond a lab.
 
-### Deployment overview
+### Outputs
 
-The `__deploymentOverview` output renders a table on the deployment page with the VM's name, hostname, domain, power state, zone, internal IP, public (load balancer) IP and class, followed by the SSH command:
-
-- With `expose-ssh`: `username@<load balancer IP>`
-- Without: `vmware@<VM internal IP>`
-
-The IP can take a minute to show up after the deployment completes.
+| Output | Description |
+|---|---|
+| `__deploymentOverview` | Renders the custom **Overview** tab described [above](#-the-overview-tab) |
 
 ---
 
